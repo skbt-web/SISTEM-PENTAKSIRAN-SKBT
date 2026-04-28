@@ -1,397 +1,333 @@
-import React, { useState } from 'react';
-import { 
-  LogOut, 
-  User, 
-  Lock, 
-  LayoutDashboard, 
-  ClipboardList, 
-  Users, 
-  Settings, 
-  Search,
-  Plus,
-  Save,
-  Trash2,
-  GraduationCap,
-  ShieldCheck,
-  FileSpreadsheet,
-  BookOpen
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pentaksiran SK Bukit Tongkat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-emerald-50/30 min-h-screen">
 
-const App = () => {
-  // State Pengurusan
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  // ==========================================
-  // TEMPAT UNTUK TAMBAH NAMA GURU & ADMIN
-  // ==========================================
-  const SenaraiPengguna = {
-    guru: [
-      {
-        email: 'g-81430999@moe-dl.edu.my',
-        password: 'jba2054',
-        name: 'KHAIRULAZMAN',
-        fullName: 'KHAIRULAZMAN BIN DOLLAH'
-      },
-
-      {
-        email: 'g-93438883@moe-dl.edu.my', // Contoh Guru Ke-3
-        password: 'jba2054',
-        name: 'MOHAMAD HIJRAN',
-        fullName: 'MOHAMAD HIJRAN BIN AHMAD IDRUS'
-      },
-  
-      // Tambah guru di sini mengikut format di atas
-    ],
-    admin: [
-      {
-        email: 'admin@moe-dl.edu.my',
-        password: 'admin123',
-        name: 'PENTADBIR SISTEM',
-        fullName: 'ADMINISTRATOR SKBT'
-      }
-      // Tambah admin di sini jika perlu
-    ]
-  };
-
-  // State Data (Mock Data)
-  const [students, setStudents] = useState([
-    { id: 1, nama: 'Ahmad bin Zulkifli', kelas: '6 Arif', bm: 85, bi: 78, math: 92, sains: 88 },
-    { id: 2, nama: 'Siti Nurhaliza binti Ramli', kelas: '6 Arif', bm: 92, bi: 88, math: 75, sains: 82 },
-    { id: 3, nama: 'Chong Wei Han', kelas: '6 Arif', bm: 70, bi: 85, math: 95, sains: 90 },
-  ]);
-
-  // Form Log Masuk
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  // Fungsi Log Masuk yang telah dikemaskini untuk mencari dalam senarai
-  const handleLogin = (e, type = 'guru') => {
-    if (e) e.preventDefault();
-    setError('');
-
-    if (!email || !password) {
-      setError('Sila masukkan emel dan kata laluan.');
-      return;
-    }
-
-    if (!email.endsWith('@moe-dl.edu.my')) {
-      setError('Sila gunakan emel DELIMa yang sah (@moe-dl.edu.my)');
-      return;
-    }
-
-    // Cari pengguna dalam senarai berdasarkan jenis (guru/admin)
-    const list = type === 'admin' ? SenaraiPengguna.admin : SenaraiPengguna.guru;
-    const foundUser = list.find(u => u.email === email && u.password === password);
-
-    if (foundUser) {
-      setUser({ 
-        email: foundUser.email, 
-        name: foundUser.name, 
-        fullName: foundUser.fullName,
-        role: type === 'admin' ? 'Admin' : 'Guru' 
-      });
-      setIsAdmin(type === 'admin');
-      setIsLoggedIn(true);
-    } else {
-      setError(`Kredensial ${type === 'admin' ? 'Admin' : 'Guru'} tidak sah.`);
-    }
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUser(null);
-    setIsAdmin(false);
-    setCurrentPage('dashboard');
-    setEmail('');
-    setPassword('');
-  };
-
-  // Komponen Login
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
-          <div className="bg-emerald-600 p-8 text-white text-center">
-            <div className="bg-white/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-              <GraduationCap size={40} />
+    <!-- LOGIN PAGE -->
+    <div id="login-page" class="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
+            <div class="bg-emerald-600 p-8 text-white text-center">
+                <div class="bg-white/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                    <i data-lucide="graduation-cap" class="w-10 h-10 text-white"></i>
+                </div>
+                <h1 class="text-2xl font-bold uppercase tracking-tight">Sistem Pentaksiran & UASA</h1>
+                <p class="opacity-80">SK Bukit Tongkat (JBA2054)</p>
             </div>
-            <h1 className="text-2xl font-bold uppercase tracking-tight">SISTEM PENGURUSAN PENTAKSIRAN & UASA</h1>
-            <p className="opacity-80">SK Bukit Tongkat (JBA2054)</p>
-          </div>
-          
-          <div className="p-8 space-y-6">
-            <form className="space-y-5">
-              {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <User size={16} /> Emel DELIMa
-                </label>
-                <input 
-                  type="email" 
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                  placeholder="g-xxxxxxxx@moe-dl.edu.my"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Lock size={16} /> Kata Laluan
-                </label>
-                <input 
-                  type="password" 
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                  placeholder="********"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <button type="button" onClick={(e) => handleLogin(e, 'guru')} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md">
-                  Log Masuk Guru
-                </button>
-                <button type="button" onClick={(e) => handleLogin(e, 'admin')} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
-                  <ShieldCheck size={20} /> Admin
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const SidebarItem = ({ icon: Icon, label, id }) => (
-    <button
-      onClick={() => setCurrentPage(id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-        currentPage === id 
-          ? 'bg-emerald-50 text-emerald-700 font-bold' 
-          : 'text-gray-500 hover:bg-emerald-50/50 hover:text-emerald-600'
-      }`}
-    >
-      <Icon size={20} />
-      <span>{label}</span>
-    </button>
-  );
-
-  return (
-    <div className="min-h-screen bg-emerald-50/30 flex font-sans">
-      <aside className="w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="bg-emerald-600 p-2 rounded-lg text-white">
-            <GraduationCap size={24} />
-          </div>
-          <span className="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
-        </div>
-
-        <nav className="space-y-2 flex-grow">
-          <SidebarItem icon={LayoutDashboard} label="Dashboard" id="dashboard" />
-          
-          {isAdmin ? (
-            <>
-              <SidebarItem icon={Users} label="Data Murid" id="data_murid" />
-              <SidebarItem icon={ClipboardList} label="Pentaksiran 1" id="pentaksiran_1" />
-              <SidebarItem icon={FileSpreadsheet} label="UASA" id="uasa" />
-            </>
-          ) : (
-            <>
-              <SidebarItem icon={BookOpen} label="Pengisian Markah" id="pengisian_markah" />
-            </>
-          )}
-          
-          <SidebarItem icon={Settings} label="Tetapan" id="settings" />
-        </nav>
-
-        <div className="mt-auto pt-6 border-t border-emerald-50">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${isAdmin ? 'bg-slate-800' : 'bg-emerald-500'}`}>
-              {isAdmin ? 'A' : user?.name?.charAt(0)}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold text-gray-800 truncate">{user?.name}</p>
-              <p className="text-[10px] font-bold uppercase text-gray-400">{user?.role}</p>
-            </div>
-          </div>
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-all font-semibold text-sm">
-            <LogOut size={18} /> Log Keluar
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-grow flex flex-col h-screen overflow-hidden">
-        <header className="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
-          <h2 className="font-bold text-gray-800 text-xl capitalize">
-            {currentPage.replace('_', ' ')}
-          </h2>
-          <div className="flex items-center gap-2">
-            {isAdmin && <span className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider">Admin Mode</span>}
-          </div>
-        </header>
-
-        <div className="p-8 overflow-y-auto flex-grow">
-          {currentPage === 'dashboard' && (
-            <div className="space-y-8">
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 text-emerald-50 opacity-10">
-                  <GraduationCap size={120} />
-                </div>
-                <div className="relative z-10">
-                  <h1 className="text-2xl font-black text-gray-800 mb-1">
-                    Selamat Datang {user?.fullName}
-                  </h1>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Status Sistem</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <h3 className="text-2xl font-bold text-emerald-600">Aktif</h3>
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Sesi Akademik</p>
-                  <h3 className="text-2xl font-bold text-gray-800">2024/2025</h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">ID Sekolah</p>
-                  <h3 className="text-2xl font-bold text-gray-800">JBA2054</h3>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Halaman Pengisian Markah (GURU) */}
-          {currentPage === 'pengisian_markah' && (
-            <div className="space-y-6">
-               <div className="bg-white rounded-2xl shadow-sm border border-emerald-50 overflow-hidden">
-                <div className="p-6 border-b flex justify-between items-center bg-emerald-50/10">
-                  <div>
-                    <h4 className="font-bold text-gray-800">Senarai Nama Murid & Markah</h4>
-                    <p className="text-xs text-gray-500">Sila masukkan markah bagi setiap murid di bawah.</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <select className="bg-emerald-600 text-white border-none rounded-lg px-4 py-2 text-sm font-bold outline-none shadow-sm">
-                      <option>Tahun 6 Arif</option>
-                      <option>Tahun 6 Bijak</option>
-                    </select>
-                  </div>
-                </div>
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-emerald-50/50 text-emerald-700 text-[11px] uppercase tracking-widest font-bold">
-                      <th className="p-4 border-b">Nama Murid</th>
-                      <th className="p-4 border-b text-center">Markah (%)</th>
-                      <th className="p-4 border-b text-right">Tindakan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => (
-                      <tr key={s.id} className="hover:bg-emerald-50/20 border-b border-emerald-50 transition-colors">
-                        <td className="p-4 text-sm font-semibold text-gray-700 uppercase">{s.nama}</td>
-                        <td className="p-4 text-center">
-                          <input 
-                            type="number" 
-                            className="w-20 p-2 text-center bg-gray-50 rounded-lg border border-gray-100 focus:ring-2 focus:ring-emerald-200 focus:bg-white outline-none font-bold" 
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="p-4 text-right">
-                          <button className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors" title="Simpan Markah">
-                            <Save size={18}/>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="p-6 bg-gray-50/50 border-t flex justify-end">
-                  <button className="bg-emerald-600 text-white px-8 py-2 rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all">
-                    Simpan Semua
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Halaman Admin: Data Murid */}
-          {currentPage === 'data_murid' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-gray-800 text-lg">Pengurusan Data Murid</h3>
-                  <p className="text-sm text-gray-500">Daftar, kemas kini atau padam maklumat murid SKBT.</p>
-                </div>
-                <button className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-md">
-                  <Plus size={18}/> Tambah Murid
-                </button>
-              </div>
-              <div className="bg-white rounded-3xl shadow-sm border border-emerald-100 p-12 text-center">
-                <div className="bg-emerald-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-600">
-                  <Users size={32} />
-                </div>
-                <p className="text-gray-500 font-medium">Modul pengurusan data murid sedang dikemas kini untuk penyelarasan APDM.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Halaman Admin: Pentaksiran 1 & UASA */}
-          {(currentPage === 'pentaksiran_1' || currentPage === 'uasa') && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl shadow-sm border border-emerald-100 p-12 text-center space-y-5">
-                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-600 shadow-inner">
-                  <FileSpreadsheet size={48} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-gray-800 uppercase mb-2">Laporan {currentPage.replace('_', ' ')}</h3>
-                  <p className="text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
-                    Jana slip keputusan atau rumusan prestasi bagi fasa {currentPage === 'uasa' ? 'Ujian Akhir Sesi Akademik' : 'Pentaksiran Pertengahan'}.
-                  </p>
-                </div>
-                <div className="flex justify-center gap-3 pt-4">
-                  <button className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:scale-105 transition-transform">Jana Laporan</button>
-                  <button className="border-2 border-emerald-100 text-emerald-700 px-8 py-3 rounded-2xl font-bold hover:bg-emerald-50 transition-colors">Eksport Excel</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentPage === 'settings' && (
-            <div className="bg-white p-10 rounded-3xl border border-emerald-100 shadow-sm max-w-2xl">
-              <h3 className="font-bold text-gray-800 text-xl mb-6 flex items-center gap-3">
-                <Settings size={24} className="text-emerald-600"/> Tetapan Akaun
-              </h3>
-              <div className="space-y-6">
-                <div className="p-6 bg-emerald-50/30 rounded-2xl border border-emerald-50">
-                  <p className="text-xs text-emerald-600 font-black uppercase tracking-widest mb-1">Peranan Akses</p>
-                  <p className="font-bold text-gray-800 text-lg">{isAdmin ? 'Pentadbir Sistem (Admin)' : 'Guru Mata Pelajaran'}</p>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <button className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-left group">
-                    <div>
-                      <p className="font-bold text-gray-800 group-hover:text-emerald-600 transition-colors">Tukar Kata Laluan</p>
-                      <p className="text-xs text-gray-400">Kemaskini sekuriti akaun anda</p>
+            
+            <div class="p-8 space-y-6">
+                <div id="login-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100"></div>
+                <form id="login-form" class="space-y-5">
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i data-lucide="user" class="w-4 h-4"></i> Emel DELIMa
+                        </label>
+                        <input id="email" type="email" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="g-xxxxxxxx@moe-dl.edu.my">
                     </div>
-                    <Lock size={18} className="text-gray-300" />
-                  </button>
-                </div>
-              </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i data-lucide="lock" class="w-4 h-4"></i> Kata Laluan
+                        </label>
+                        <input id="password" type="password" required class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="********">
+                    </div>
+                    <div class="grid grid-cols-1 gap-3">
+                        <button type="button" onclick="handleLogin('guru')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md">
+                            Log Masuk Guru
+                        </button>
+                        <button type="button" onclick="handleLogin('admin')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i> Admin
+                        </button>
+                    </div>
+                </form>
             </div>
-          )}
         </div>
-      </main>
     </div>
-  );
-};
 
-export default App;
+    <!-- MAIN APP LAYOUT (HIDDEN BY DEFAULT) -->
+    <div id="app-container" class="hidden min-h-screen flex">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0">
+            <div class="flex items-center gap-3 mb-10 px-2">
+                <div class="bg-emerald-600 p-2 rounded-lg text-white">
+                    <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+                </div>
+                <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
+            </div>
+
+            <nav id="nav-menu" class="space-y-2 flex-grow">
+                <!-- Navigation Items dynamically rendered here -->
+            </nav>
+
+            <div class="mt-auto pt-6 border-t border-emerald-50">
+                <div class="flex items-center gap-3 mb-4 px-2">
+                    <div id="user-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm"></div>
+                    <div class="overflow-hidden">
+                        <p id="user-name-display" class="text-sm font-bold text-gray-800 truncate"></p>
+                        <p id="user-role-display" class="text-[10px] font-bold uppercase text-gray-400"></p>
+                    </div>
+                </div>
+                <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-all font-semibold text-sm">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Log Keluar
+                </button>
+            </div>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="flex-grow flex flex-col h-screen overflow-hidden">
+            <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
+                <h2 id="page-title" class="font-bold text-gray-800 text-xl capitalize">Dashboard</h2>
+                <div id="admin-indicator" class="hidden">
+                    <span class="bg-slate-800 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider">Admin Mode</span>
+                </div>
+            </header>
+
+            <div id="page-content" class="p-8 overflow-y-auto flex-grow">
+                <!-- Page Content dynamically rendered here -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        const SenaraiPengguna = {
+            guru: [
+                {
+                    email: 'g-81430999@moe-dl.edu.my',
+                    password: 'jba2054',
+                    name: 'KHAIRULAZMAN',
+                    fullName: 'KHAIRULAZMAN BIN DOLLAH'
+                },
+                {
+                    email: 'g-12345678@moe-dl.edu.my',
+                    password: 'cikgu2',
+                    name: 'SITI',
+                    fullName: 'SITI AMINAH BINTI AHMAD'
+                }
+            ],
+            admin: [
+                {
+                    email: 'admin@moe-dl.edu.my',
+                    password: 'admin123',
+                    name: 'PENTADBIR SISTEM',
+                    fullName: 'ADMINISTRATOR SKBT'
+                }
+            ]
+        };
+
+        const students = [
+            { id: 1, nama: 'Ahmad bin Zulkifli', kelas: '6 Arif' },
+            { id: 2, nama: 'Siti Nurhaliza binti Ramli', kelas: '6 Arif' },
+            { id: 3, nama: 'Chong Wei Han', kelas: '6 Arif' }
+        ];
+
+        let currentUser = null;
+        let isAdmin = false;
+        let currentPage = 'dashboard';
+
+        // --- AUTH FUNCTIONS ---
+        function handleLogin(type) {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('login-error');
+
+            errorDiv.classList.add('hidden');
+
+            if (!email || !password) {
+                showError('Sila masukkan emel dan kata laluan.');
+                return;
+            }
+
+            if (!email.endsWith('@moe-dl.edu.my')) {
+                showError('Sila gunakan emel DELIMa yang sah (@moe-dl.edu.my)');
+                return;
+            }
+
+            const list = type === 'admin' ? SenaraiPengguna.admin : SenaraiPengguna.guru;
+            const found = list.find(u => u.email === email && u.password === password);
+
+            if (found) {
+                currentUser = { ...found, role: type === 'admin' ? 'Admin' : 'Guru' };
+                isAdmin = type === 'admin';
+                showApp();
+            } else {
+                showError(`Kredensial ${type === 'admin' ? 'Admin' : 'Guru'} tidak sah.`);
+            }
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.innerText = msg;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // --- NAVIGATION ---
+        function showApp() {
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            
+            // Set User Info
+            document.getElementById('user-name-display').innerText = currentUser.name;
+            document.getElementById('user-role-display').innerText = currentUser.role;
+            const avatar = document.getElementById('user-avatar');
+            avatar.innerText = currentUser.name.charAt(0);
+            avatar.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${isAdmin ? 'bg-slate-800' : 'bg-emerald-500'}`;
+
+            if (isAdmin) {
+                document.getElementById('admin-indicator').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-indicator').classList.add('hidden');
+            }
+
+            renderMenu();
+            navigate('dashboard');
+        }
+
+        function renderMenu() {
+            const menu = document.getElementById('nav-menu');
+            let html = `<button onclick="navigate('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="dashboard">
+                <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+            </button>`;
+
+            if (isAdmin) {
+                html += `
+                <button onclick="navigate('data_murid')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="data_murid">
+                    <i data-lucide="users"></i><span>Data Murid</span>
+                </button>
+                <button onclick="navigate('pentaksiran_1')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="pentaksiran_1">
+                    <i data-lucide="clipboard-list"></i><span>Pentaksiran 1</span>
+                </button>
+                <button onclick="navigate('uasa')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="uasa">
+                    <i data-lucide="file-spreadsheet"></i><span>UASA</span>
+                </button>`;
+            } else {
+                html += `
+                <button onclick="navigate('pengisian_markah')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="pengisian_markah">
+                    <i data-lucide="book-open"></i><span>Pengisian Markah</span>
+                </button>`;
+            }
+
+            html += `
+            <button onclick="navigate('settings')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="settings">
+                <i data-lucide="settings"></i><span>Tetapan</span>
+            </button>`;
+
+            menu.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function navigate(pageId) {
+            currentPage = pageId;
+            document.getElementById('page-title').innerText = pageId.replace('_', ' ');
+            
+            // Update Active Class
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.getAttribute('data-page') === pageId) {
+                    btn.classList.add('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.remove('text-gray-500');
+                } else {
+                    btn.classList.remove('bg-emerald-50', 'text-emerald-700', 'font-bold');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            renderPage();
+        }
+
+        // --- RENDER PAGES ---
+        function renderPage() {
+            const container = document.getElementById('page-content');
+            
+            if (currentPage === 'dashboard') {
+                container.innerHTML = `
+                <div class="space-y-8">
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-8 text-emerald-50 opacity-10">
+                            <i data-lucide="graduation-cap" style="width: 120px; height: 120px;"></i>
+                        </div>
+                        <div class="relative z-10">
+                            <h1 class="text-2xl font-black text-gray-800 mb-1">
+                                Selamat Datang ${currentUser.fullName}
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Status Sistem</p>
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <h3 class="text-2xl font-bold text-emerald-600">Aktif</h3>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Sesi Akademik</p>
+                            <h3 class="text-2xl font-bold text-gray-800">2024/2025</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">ID Sekolah</p>
+                            <h3 class="text-2xl font-bold text-gray-800">JBA2054</h3>
+                        </div>
+                    </div>
+                </div>`;
+            } 
+            else if (currentPage === 'pengisian_markah') {
+                let rows = students.map(s => `
+                    <tr class="hover:bg-emerald-50/20 border-b border-emerald-50 transition-colors">
+                        <td class="p-4 text-sm font-semibold text-gray-700 uppercase">${s.nama}</td>
+                        <td class="p-4 text-center">
+                            <input type="number" class="w-20 p-2 text-center bg-gray-50 rounded-lg border border-gray-100 focus:ring-2 focus:ring-emerald-200 outline-none font-bold" placeholder="0">
+                        </td>
+                        <td class="p-4 text-right">
+                            <button class="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg"><i data-lucide="save"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-sm border border-emerald-50 overflow-hidden">
+                    <div class="p-6 border-b flex justify-between items-center bg-emerald-50/10">
+                        <div><h4 class="font-bold text-gray-800">Markah Murid</h4></div>
+                        <select class="bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-bold"><option>Tahun 6 Arif</option></select>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-emerald-50/50 text-emerald-700 text-[11px] uppercase font-bold"><th class="p-4">Nama</th><th class="p-4 text-center">Markah (%)</th><th class="p-4 text-right">Aksi</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+            }
+            else {
+                container.innerHTML = `<div class="bg-white rounded-3xl p-12 text-center border border-emerald-100 shadow-sm">
+                    <div class="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                        <i data-lucide="settings" class="w-10 h-10"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800">Halaman Sedang Dikemaskini</h3>
+                    <p class="text-gray-500">Modul ini akan tersedia tidak lama lagi.</p>
+                </div>`;
+            }
+            
+            lucide.createIcons();
+        }
+
+        // Initialize Icons for Login Page
+        lucide.createIcons();
+    </script>
+</body>
+</html>
