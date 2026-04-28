@@ -18,8 +18,9 @@
     <div id="login-page" class="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
         <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
             <div class="bg-emerald-600 p-8 text-white text-center">
-                <div class="bg-white/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                    <i data-lucide="graduation-cap" class="w-10 h-10 text-white"></i>
+              <!-- LOGO SEKOLAH (logo.png dari GitHub/Folder Tempatan) -->
+                <div class="bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden border-2 border-white">
+                    <img src="logo.png" alt="Logo SK Bukit Tongkat" class="w-20 h-20 object-contain" onerror="this.src='https://placehold.co/100x100?text=LOGO'">
                 </div>
                 <h1 class="text-2xl font-bold uppercase tracking-tight">Sistem Pentaksiran & UASA</h1>
                 <p class="opacity-80">SK Bukit Tongkat (JBA2054)</p>
@@ -58,12 +59,13 @@
         <!-- Sidebar -->
         <aside class="w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0">
             <div class="flex items-center gap-3 mb-10 px-2">
-                <div class="bg-emerald-600 p-2 rounded-lg text-white">
-                    <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+                <!-- LOGO SEKOLAH KECIL -->
+                <div class="bg-white p-1 rounded-lg shadow-sm border border-emerald-100">
+                    <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain" onerror="this.src='https://placehold.co/40x40?text=LOGO'">
                 </div>
                 <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
             </div>
-
+            
             <nav id="nav-menu" class="space-y-2 flex-grow">
                 <!-- Navigation Items dynamically rendered here -->
             </nav>
