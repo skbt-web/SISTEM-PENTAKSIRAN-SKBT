@@ -13,10 +13,8 @@
         #sidebar {
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        @media (max-width: 1024px) {
-            #sidebar.closed {
-                transform: translateX(-100%);
-            }
+        #sidebar.closed {
+            transform: translateX(-100%);
         }
     </style>
 </head>
@@ -66,11 +64,11 @@
 
     <!-- MAIN APP LAYOUT -->
     <div id="app-container" class="hidden min-h-screen flex">
-        <!-- Sidebar Hamburger Overlay -->
-        <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+        <!-- Sidebar Toggle Overlay -->
+        <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40"></div>
 
-        <!-- Sidebar -->
-        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0 z-50 closed lg:translate-x-0">
+        <!-- Sidebar (Can toggle on both mobile and desktop screens) -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-emerald-100 flex flex-col p-6 shadow-sm shrink-0 z-50 closed">
             <div class="flex items-center justify-between mb-10 px-2 lg:block">
                 <div class="flex items-center gap-3">
                     <div class="bg-white p-1 rounded-lg shadow-sm border border-emerald-100 shrink-0">
@@ -78,9 +76,9 @@
                     </div>
                     <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
                 </div>
-                <!-- Hamburger Menu Close Button (Mobile Only) -->
-                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
-                    <i data-lucide="x"></i>
+                <!-- Sidebar Toggle Close Button (Available everywhere) -->
+                <button onclick="toggleSidebar()" class="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all" title="Tutup Menu">
+                    <i data-lucide="panel-left-close" class="w-5 h-5"></i>
                 </button>
             </div>
             
@@ -106,9 +104,10 @@
         <main class="flex-grow flex flex-col h-screen w-full min-w-0">
             <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30">
                 <div class="flex items-center gap-3">
-                    <!-- Hamburger Menu Toggle Button -->
-                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-all focus:outline-none">
-                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    <!-- Sidebar Toggle Button (Gantikan Hamburger Menu) -->
+                    <button onclick="toggleSidebar()" class="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 px-3 border border-emerald-200" title="Togol Bar Sisi">
+                        <i data-lucide="panel-left" class="w-5 h-5"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider hidden sm:inline">Menu</span>
                     </button>
                     <h2 id="page-title" class="font-bold text-gray-800 text-lg md:text-xl capitalize truncate">Dashboard</h2>
                 </div>
@@ -357,7 +356,7 @@
             renderPage();
         }
 
-        // Expanded/Improved Hamburger logic (both side slide & overlay trigger correctly)
+        // Expanded/Improved Sidebar Toggle logic
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -582,7 +581,7 @@
                 </div>`;
             }
 
-            // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA - REKA BENTUK DIPERBARUI)
+            // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA)
             else if (currentPage === 'pengisian_markah') {
                 const filteredStudents = students.filter(s => s.kelas === selectedClass);
 
@@ -651,7 +650,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                             
                             <!-- 1. TAHUN -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">1</span>
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tahun Akademik</span>
@@ -667,7 +666,7 @@
                             </div>
 
                             <!-- 2. PILIHAN KELAS -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">2</span>
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pilihan Kelas</span>
@@ -683,7 +682,7 @@
                             </div>
 
                             <!-- 3. JENIS UJIAN -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">3</span>
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Jenis Ujian</span>
@@ -699,7 +698,7 @@
                             </div>
 
                             <!-- 4. SUBJEK -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">4</span>
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Subjek Matapelajaran</span>
@@ -715,7 +714,7 @@
                             </div>
 
                             <!-- 5. NAMA GURU -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">5</span>
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nama Guru Pemeriksa</span>
