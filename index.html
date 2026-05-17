@@ -16,6 +16,16 @@
         #sidebar.closed {
             transform: translateX(-100%);
         }
+        /* Sticky Column Effect for the extensive monitoring table */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: white;
+            z-index: 10;
+        }
+        tr:hover .sticky-col {
+            background-color: #f8fafc !important; /* Tailwind slate-50 on hover */
+        }
     </style>
 </head>
 <body class="bg-emerald-50/30 min-h-screen">
@@ -166,11 +176,14 @@
             '5 AR-RAZI', '6 AR-RAZI', '7 AL-KHAWARIZMI'
         ];
         const assessments = ['PENTAKSIRAN SUMATIF 1', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
-        const subjects = [
+        
+        // Penuh 9 subjek asas pemantauan sepadan dengan spesifikasi
+        const baseSubjects = [
             'BAHASA MELAYU', 'BAHASA INGGERIS', 'SAINS', 'MATEMATIK', 'PENDIDIKAN ISLAM',
-            'BAHASA ARAB', 'MUZIK', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'PENDIDIKAN SENI DAN VISUAL',
-            'REKA BENTUK DAN TEKNOLOGI'
+            'BAHASA ARAB', 'MUZIK', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'PENDIDIKAN SENI DAN VISUAL'
         ];
+        const subjects = baseSubjects; // compatibility fallback
+
         const teachers = [
             'MAZUIN BINTI AHMAD KAMIL', 'MOHD KAMAL BIN MOHD SHAH', 'NOR AZAH BINTI MORI',
             'MOHD FAEIZ BIN SANUSI', 'KHAIRULAZMAN BIN DOLLAH', 'ZULKARNAIN BINM. AYOB',
@@ -188,6 +201,13 @@
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 78,
             '14_2026_PENTAKSIRAN SUMATIF 1_SAINS': 92,
             '14_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 68,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 80,
+            '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA ARAB': 75,
+            '14_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 85,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 90,
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI DAN VISUAL': 82,
+            '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 88, // dummy for Tahun 6
+
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 55,
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 40,
             '15_2026_PENTAKSIRAN SUMATIF 1_SAINS': 33,
@@ -203,6 +223,8 @@
         const studentPBD = {
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP5',
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4',
+            '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP4',
+            '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 'TP5',
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3',
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP2'
         };
@@ -211,6 +233,7 @@
         let isAdmin = false;
         let currentPage = 'dashboard';
         let isEditMode = true; // Default Edit Mode enabled for inputting scores
+        let searchQuery = ''; // State carian global
 
         // Keadaan penapis laluan
         let selectedYear = '2026';
@@ -437,9 +460,21 @@
         // --- PROSES KEMAS KINI FILTER ---
         function handleFilterChange() {
             selectedYear = document.getElementById('sel-year').value;
-            selectedClass = document.getElementById('sel-class').value;
+            const newClass = document.getElementById('sel-class').value;
+            
+            // Check if RBT should be reset in subject selection
+            const newClassYear = parseInt(newClass.charAt(0)) || 1;
+            selectedClass = newClass;
+            
+            if (newClassYear < 4 && selectedSubject === 'REKA BENTUK TEKNOLOGI') {
+                selectedSubject = 'BAHASA MELAYU';
+            }
+            
             selectedAssessment = document.getElementById('sel-test').value;
-            selectedSubject = document.getElementById('sel-subject').value;
+            const subElem = document.getElementById('sel-subject');
+            if (subElem) {
+                selectedSubject = subElem.value || 'BAHASA MELAYU';
+            }
             selectedTeacher = document.getElementById('sel-teacher').value;
             renderPage();
         }
@@ -615,7 +650,291 @@
             }
         }
 
-        // --- RENDER PAGE CONTENT ---
+        // --- CALCULATE CLASS RANKINGS IN-MEMORY ---
+        function getClassRankings(targetClass) {
+            const classStudents = students.filter(s => s.kelas === targetClass);
+            const classYear = parseInt(targetClass.charAt(0)) || 1;
+            const isRBTVisible = classYear >= 4;
+            const activeSubjects = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
+
+            const performances = classStudents.map(s => {
+                let totalMarks = 0;
+                let count = 0;
+                activeSubjects.forEach(sub => {
+                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    const score = studentMarks[key];
+                    if (score !== undefined) {
+                        totalMarks += score;
+                        count++;
+                    }
+                });
+                const percentage = count > 0 ? Math.round((totalMarks / (count * 100)) * 100) : 0;
+                return {
+                    id: s.id,
+                    totalMarks: totalMarks,
+                    percentage: percentage
+                };
+            });
+
+            // Susun berdasarkan peratus tertinggi, kemudian jumlah markah tertinggi
+            performances.sort((a, b) => b.percentage - a.percentage || b.totalMarks - a.totalMarks);
+
+            const rankings = {};
+            performances.forEach((p, index) => {
+                rankings[p.id] = index + 1;
+            });
+            return rankings;
+        }
+
+        // --- DETAILED COMPREHENSIVE MONITORING TABLE FOR ADMIN & GURU KELAS ---
+        function renderComprehensiveMonitoringTable(isAdminView) {
+            const classStudents = students.filter(s => s.kelas === selectedClass);
+            const classRankings = getClassRankings(selectedClass);
+            const classYear = parseInt(selectedClass.charAt(0)) || 1;
+            const isRBTVisible = classYear >= 4;
+            
+            // Susun RBT bersebelahan dengan Pendidikan Seni Visual
+            const activeSubjects = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
+
+            // Monitoring Stats
+            const totalRequiredEntries = classStudents.length * activeSubjects.length;
+            let actualFilledEntries = 0;
+
+            let subjectProgressList = activeSubjects.map(sub => {
+                let filledCount = 0;
+                classStudents.forEach(st => {
+                    const key = `${st.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    if (studentMarks[key] !== undefined) {
+                        filledCount++;
+                        actualFilledEntries++;
+                    }
+                });
+                const subPercent = classStudents.length > 0 ? Math.round((filledCount / classStudents.length) * 100) : 0;
+                let badgeColor = 'bg-rose-50 text-rose-700 border-rose-100';
+                if (subPercent === 100) badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                else if (subPercent > 0) badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+
+                return `
+                <div class="p-3 border rounded-2xl ${badgeColor} transition-all space-y-1.5 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-black truncate max-w-[110px]">${sub}</span>
+                        <span class="text-[10px] font-black">${subPercent}%</span>
+                    </div>
+                    <div class="flex justify-between text-[9px] font-semibold opacity-80">
+                        <span>Selesai: ${filledCount}/${classStudents.length}</span>
+                    </div>
+                    <div class="w-full bg-black/5 rounded-full h-1">
+                        <div class="bg-current h-1 rounded-full transition-all duration-300" style="width: ${subPercent}%"></div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            const overallProgressPercent = totalRequiredEntries > 0 ? Math.round((actualFilledEntries / totalRequiredEntries) * 100) : 0;
+
+            // Apply Search Filter locally
+            const queriedStudents = classStudents.filter(s => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return s.nama.toLowerCase().includes(q) || s.ic.includes(q);
+            });
+
+            const totalColumns = 2 + (activeSubjects.length * 3) + 4;
+            const tableMinWidth = 250 + 140 + (activeSubjects.length * 180) + 140 + 110 + 110 + 140;
+
+            let monitoringRowsHTML = queriedStudents.map(s => {
+                let sum = 0;
+                let count = 0;
+
+                let subjectCellsHTML = activeSubjects.map(sub => {
+                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    const score = studentMarks[key];
+                    const pbd = studentPBD[key] !== undefined ? studentPBD[key] : '-';
+
+                    if (score !== undefined) {
+                        sum += score;
+                        count++;
+                        const gradeInfo = calculateUASAGrade(score);
+                        return `
+                        <td class="p-3 text-center border-r border-slate-100 font-mono text-xs font-semibold text-slate-800">${score}</td>
+                        <td class="p-3 text-center border-r border-slate-100">
+                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
+                        </td>
+                        <td class="p-3 text-center border-r border-slate-100 font-bold text-xs text-indigo-700">${pbd}</td>
+                        `;
+                    } else {
+                        return `
+                        <td class="p-3 text-center border-r border-slate-100 text-gray-400 italic text-xs">-</td>
+                        <td class="p-3 text-center border-r border-slate-100 text-gray-400 italic text-xs">-</td>
+                        <td class="p-3 text-center border-r border-slate-100 text-gray-400 italic text-xs">-</td>
+                        `;
+                    }
+                }).join('');
+
+                const average = count > 0 ? Math.round((sum / (count * 100)) * 100) : 0;
+                const rank = classRankings[s.id] || '-';
+                const finalGradeInfo = calculateUASAGrade(average);
+
+                return `
+                <tr class="hover:bg-slate-50/50 border-b border-slate-100 transition-colors">
+                    <td class="p-4 text-sm font-bold text-slate-800 uppercase sticky left-0 bg-white group-hover:bg-slate-50 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)] sticky-col">${s.nama}</td>
+                    <td class="p-4 text-xs font-semibold text-slate-500 font-mono border-r border-slate-100">${s.ic}</td>
+                    ${subjectCellsHTML}
+                    <td class="p-4 text-center font-black text-slate-800 border-r border-slate-100 font-mono text-xs">${sum}</td>
+                    <td class="p-4 text-center font-black text-emerald-600 bg-emerald-50/20 border-r border-slate-100 font-mono text-xs">${average}%</td>
+                    <td class="p-4 text-center font-bold text-indigo-600 border-r border-slate-100 font-mono text-xs">${rank}</td>
+                    <td class="p-4 text-center font-semibold">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-black border ${finalGradeInfo.color}">${finalGradeInfo.grade}</span>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            if (monitoringRowsHTML.length === 0) {
+                monitoringRowsHTML = `<tr><td colspan="${totalColumns}" class="p-8 text-center text-gray-400 font-bold italic">Tiada data murid ditemui bagi kriteria carian.</td></tr>`;
+            }
+
+            const headerSubjectsHTML = activeSubjects.map(sub => `
+                <th colspan="3" class="p-2 text-center border-r border-emerald-100">${sub}</th>
+            `).join('');
+
+            const subHeadersHTML = activeSubjects.map(() => `
+                <th class="p-2 border-r border-emerald-100 text-center w-[60px]">M</th>
+                <th class="p-2 border-r border-emerald-100 text-center w-[60px]">G</th>
+                <th class="p-2 border-r border-emerald-100 text-center w-[60px]">PBD</th>
+            `).join('');
+
+            const roleHeaderHTML = isAdminView ? `
+                <div class="bg-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-8 text-white opacity-5">
+                        <i data-lucide="shield-check" style="width: 150px; height: 150px;"></i>
+                    </div>
+                    <div class="relative z-10 space-y-2">
+                        <span class="bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">KONSOL KAWALAN PENTADBIRAN</span>
+                        <h1 class="text-3xl font-black mb-1 tracking-tight">Laporan Pemantauan SMM & UASA</h1>
+                        <p class="opacity-80 max-w-2xl text-sm leading-relaxed">
+                            Pantau dan selia status kemasukan markah merentas seluruh subjek bagi memastikan semua guru mata pelajaran selesai mengunci data.
+                        </p>
+                    </div>
+                </div>
+            ` : `
+                <div class="bg-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-8 text-white opacity-5">
+                        <i data-lucide="presentation" style="width: 150px; height: 150px;"></i>
+                    </div>
+                    <div class="relative z-10 space-y-2">
+                        <span class="bg-amber-500 text-slate-950 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">PAPARAN PEMANTAUAN GURU KELAS</span>
+                        <h1 class="text-3xl font-black mb-1 tracking-tight">Kabin Utama Guru Kelas — ${selectedClass}</h1>
+                        <p class="opacity-80 max-w-2xl text-sm leading-relaxed">
+                            Sistem analisis pemantauan secara langsung (real-time) bagi memastikan penguncian markah selesai sepenuhnya.
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            return `
+            <div class="space-y-6">
+                <!-- Header Info -->
+                ${roleHeaderHTML}
+
+                <!-- KONTROL PEMANTAUAN (CARIAN, DROP KELAS, CETAK) -->
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-50 space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-600">
+                                <i data-lucide="filter" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">Tapisan & Kawalan Pantas</h4>
+                                <p class="text-[10px] text-gray-400 font-semibold">Cari rekod murid, tukar kelas dan cetak transkrip keputusan</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Drop Kelas & Cetak -->
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="relative">
+                                <select id="sel-monitoring-class" onchange="selectedClass = this.value; renderPage();" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2.5 text-xs font-bold border-none outline-none cursor-pointer appearance-none pr-8 shadow-md">
+                                    ${classes.map(cls => `<option value="${cls}" ${selectedClass === cls ? 'selected' : ''}>Kelas: ${cls}</option>`).join('')}
+                                </select>
+                                <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-white">
+                                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                </div>
+                            </div>
+                            
+                            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                        <!-- Carian Bar -->
+                        <div class="relative w-full">
+                            <input type="text" id="monitoring-search" oninput="searchQuery = this.value; renderPage();" value="${searchQuery}" placeholder="Cari Nama atau No. KP..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-xs font-semibold outline-none transition-all">
+                            <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- Keseluruhan Progress -->
+                        <div class="md:col-span-2 flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
+                                <span class="text-xs font-bold text-slate-600">Jumlah Rekod Pengisian Kelas [${selectedClass}]:</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs font-black text-emerald-600">${overallProgressPercent}%</span>
+                                <div class="w-32 bg-slate-200 rounded-full h-2">
+                                    <div class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: ${overallProgressPercent}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INDIKATOR GURU SUBJEK -->
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100 space-y-4">
+                    <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i data-lucide="list-checks" class="text-emerald-600 w-5 h-5"></i>
+                        <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Status Penyelesaian Guru Subjek [${selectedClass}]</h4>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        ${subjectProgressList}
+                    </div>
+                </div>
+
+                <!-- TABLE MONITORING -->
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                        <h4 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                            <i data-lucide="grid" class="text-slate-600 w-5 h-5"></i> Transkrip Akademik Komprehensif [${selectedClass}]
+                        </h4>
+                        <span class="text-xs font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-full uppercase">SKBT</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left table-fixed min-w-[${tableMinWidth}px]">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-700 text-[11px] uppercase font-extrabold border-b border-slate-100">
+                                    <th rowspan="2" class="p-4 w-[250px] border-r border-slate-100 sticky left-0 bg-slate-50/90 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] sticky-col">Nama Murid</th>
+                                    <th rowspan="2" class="p-4 w-[140px] border-r border-slate-100">No. Kad Pengenalan</th>
+                                    ${headerSubjectsHTML}
+                                    <th rowspan="2" class="p-4 w-[140px] border-r border-slate-100 text-center">Markah Keseluruhan</th>
+                                    <th rowspan="2" class="p-4 w-[110px] border-r border-slate-100 text-center">Peratus</th>
+                                    <th rowspan="2" class="p-4 w-[110px] border-r border-slate-100 text-center">Kedudukan</th>
+                                    <th rowspan="2" class="p-4 w-[140px] text-center">Gred Pencapaian</th>
+                                </tr>
+                                <tr class="bg-slate-50/50 text-[9px] border-b border-slate-100 text-slate-700">
+                                    ${subHeadersHTML}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${monitoringRowsHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // --- RENDER PAGE MAIN router ---
         function renderPage() {
             const container = document.getElementById('page-content');
 
@@ -692,6 +1011,9 @@
             // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA)
             else if (currentPage === 'pengisian_markah') {
                 const filteredStudents = students.filter(s => s.kelas === selectedClass);
+                const classYear = parseInt(selectedClass.charAt(0)) || 1;
+                const isRBTVisible = classYear >= 4;
+                const activeSubjectsForClass = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
 
                 let rowsHTML = filteredStudents.map(s => {
                     const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
@@ -812,8 +1134,9 @@
                                     <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Subjek Matapelajaran</span>
                                 </div>
                                 <div class="relative">
+                                    <!-- Menu dropdown subjek dinamik mengikut Tahun Kelas -->
                                     <select id="sel-subject" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
-                                        ${subjects.map(s => `<option value="${s}" ${selectedSubject === s ? 'selected' : ''}>${s}</option>`).join('')}
+                                        ${activeSubjectsForClass.map(s => `<option value="${s}" ${selectedSubject === s ? 'selected' : ''}>${s}</option>`).join('')}
                                     </select>
                                     <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
                                         <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
@@ -896,231 +1219,12 @@
                 </div>`;
             }
 
-            // 3. GURU KELAS DASHBOARD (SAMA STRUKTUR & FUNGSI DENGAN TAMBAHAN PROGRES)
+            // 3. GURU KELAS DASHBOARD & MONITORING
             else if (currentPage === 'guru_kelas_dashboard') {
-                const targetClass = '6 AR-RAZI';
-                const classStudents = students.filter(s => s.kelas === targetClass);
-
-                let totalScoreSum = 0;
-                let evaluatedSubjectsCount = 0;
-                let studentsPerformanceList = [];
-
-                // Kira pencapaian am untuk 4 subjek utama bagi kelas ini
-                classStudents.forEach(student => {
-                    let totalStudentMarks = 0;
-                    let subjectCount = 0;
-                    
-                    subjects.slice(0, 4).forEach(subject => { 
-                        const score = studentMarks[`${student.id}_${selectedYear}_${selectedAssessment}_${subject}`];
-                        if (score !== undefined) {
-                            totalStudentMarks += score;
-                            subjectCount++;
-                            totalScoreSum += score;
-                            evaluatedSubjectsCount++;
-                        }
-                    });
-
-                    const average = subjectCount > 0 ? Math.round(totalStudentMarks / subjectCount) : 0;
-                    studentsPerformanceList.push({
-                        ...student,
-                        average: average,
-                        marksBreakdown: subjects.slice(0, 4).map(sub => ({
-                            code: sub,
-                            score: studentMarks[`${student.id}_${selectedYear}_${selectedAssessment}_${sub}`] !== undefined ? studentMarks[`${student.id}_${selectedYear}_${selectedAssessment}_${sub}`] : '-'
-                        }))
-                    });
-                });
-
-                studentsPerformanceList.sort((a, b) => b.average - a.average);
-
-                const classAverage = evaluatedSubjectsCount > 0 ? Math.round(totalScoreSum / evaluatedSubjectsCount) : 0;
-                const topStudent = studentsPerformanceList[0] ? `${studentsPerformanceList[0].nama} (${studentsPerformanceList[0].average}%)` : 'Tiada';
-                const passingStudentsCount = studentsPerformanceList.filter(s => s.average >= 40).length;
-                const passPercentage = studentsPerformanceList.length > 0 ? Math.round((passingStudentsCount / studentsPerformanceList.length) * 100) : 0;
-
-                // --- GURU KELAS: KIRA PROGRES PENGISIAN MARKAH (BARU) ---
-                // Kira berapa jumlah rekod markah yang sepatutnya diisi (Jumlah Murid x Kesemua 10 Subjek)
-                const totalRequiredEntries = classStudents.length * subjects.length;
-                let actualFilledEntries = 0;
-
-                // Kira pecahan pengisian mengikut setiap subjek
-                let subjectProgressList = subjects.map(sub => {
-                    let filledCount = 0;
-                    classStudents.forEach(student => {
-                        const key = `${student.id}_${selectedYear}_${selectedAssessment}_${sub}`;
-                        if (studentMarks[key] !== undefined) {
-                            filledCount++;
-                            actualFilledEntries++;
-                        }
-                    });
-                    const subPercent = classStudents.length > 0 ? Math.round((filledCount / classStudents.length) * 100) : 0;
-                    let subStatusBadge = '';
-                    if (subPercent === 100) {
-                        subStatusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">SELESAI</span>`;
-                    } else if (subPercent > 0) {
-                        subStatusBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">PROGRES (${filledCount}/${classStudents.length})</span>`;
-                    } else {
-                        subStatusBadge = `<span class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-medium">BELUM MULA</span>`;
-                    }
-
-                    return {
-                        name: sub,
-                        filled: filledCount,
-                        percent: subPercent,
-                        badge: subStatusBadge
-                    };
-                });
-
-                const overallProgressPercent = totalRequiredEntries > 0 ? Math.round((actualFilledEntries / totalRequiredEntries) * 100) : 0;
-
-                let studentsRows = studentsPerformanceList.map((s, idx) => {
-                    let subjectMarksHTML = s.marksBreakdown.map(m => {
-                        const gradeClass = m.score !== '-' ? calculateUASAGrade(m.score).color : '';
-                        const gradeChar = m.score !== '-' ? calculateUASAGrade(m.score).grade : '-';
-                        return `
-                        <td class="p-4 text-center">
-                            <span class="block text-sm font-bold text-slate-800">${m.score}${m.score !== '-' ? '%' : ''}</span>
-                            ${m.score !== '-' ? `<span class="text-[9px] px-1.5 py-0.5 rounded border font-bold ${gradeClass}">${gradeChar}</span>` : ''}
-                        </td>`;
-                    }).join('');
-
-                    const finalClassGrade = calculateUASAGrade(s.average);
-
-                    return `
-                    <tr class="hover:bg-slate-50/50 border-b border-slate-100 transition-colors">
-                        <td class="p-4 text-center text-sm font-bold text-slate-700">${idx + 1}</td>
-                        <td class="p-4 text-sm font-bold text-emerald-900 uppercase">${s.nama}</td>
-                        ${subjectMarksHTML}
-                        <td class="p-4 text-center font-black text-emerald-600 bg-emerald-50/10">${s.average}%</td>
-                        <td class="p-4 text-center">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-black border ${finalClassGrade.color}">${finalClassGrade.grade}</span>
-                        </td>
-                    </tr>`;
-                }).join('');
-
-                container.innerHTML = `
-                <div class="space-y-8">
-                    <div class="bg-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-8 text-white opacity-5">
-                            <i data-lucide="presentation" style="width: 150px; height: 150px;"></i>
-                        </div>
-                        <div class="relative z-10 space-y-2">
-                            <span class="bg-amber-500 text-slate-950 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">PAPARAN KHAS GURU KELAS</span>
-                            <h1 class="text-3xl font-black mb-1 tracking-tight">Kabin Utama Guru Kelas — ${targetClass}</h1>
-                            <p class="opacity-80 max-w-2xl text-sm leading-relaxed">
-                                Sesi analisis akademik berpusat untuk memantau pencapaian murid kelas anda merentasi seluruh subjek bagi penggal semasa.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Kelas Diurus</p>
-                            <h3 class="text-3xl font-black text-emerald-600">${targetClass}</h3>
-                            <p class="text-xs text-gray-400 mt-2">SK Bukit Tongkat (JBA2054)</p>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Purata Markah Kelas (4 Subjek Utama)</p>
-                            <h3 class="text-3xl font-bold text-slate-800">${classAverage}%</h3>
-                            <div class="w-full bg-slate-100 rounded-full h-1 mt-3">
-                                <div class="bg-emerald-500 h-1 rounded-full" style="width: ${classAverage}%"></div>
-                            </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Kadar Kelulusan Am</p>
-                            <h3 class="text-3xl font-bold text-slate-800">${passPercentage}%</h3>
-                            <p class="text-xs text-emerald-600 mt-2 font-bold">${passingStudentsCount} dari ${classStudents.length} murid melepasi tahap minimum</p>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Pelajar Terbaik Kelas</p>
-                            <h3 class="text-lg font-black text-slate-800 truncate" title="${topStudent}">${topStudent}</h3>
-                            <p class="text-xs text-teal-600 font-bold mt-2 flex items-center gap-1">
-                                <i data-lucide="crown" class="w-3.5 h-3.5"></i> Pencapaian tertinggi
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- GURU KELAS: PROGRES PENGISIAN MARKAH KELAS (BARU) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        
-                        <!-- Progress Summary Circle/Bar -->
-                        <div class="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex flex-col justify-between">
-                            <div class="space-y-2">
-                                <h4 class="font-bold text-slate-800 text-base flex items-center gap-2">
-                                    <i data-lucide="percent" class="text-emerald-600 w-5 h-5"></i> Progres Pengisian Markah Am
-                                </h4>
-                                <p class="text-xs text-slate-400 leading-relaxed">Penunjuk status keseluruhan bagi kemasukan markah untuk kesemua 10 subjek bagi kelas ${targetClass}.</p>
-                            </div>
-                            
-                            <div class="py-6 flex flex-col items-center justify-center">
-                                <div class="relative w-36 h-36 flex items-center justify-center bg-slate-50 rounded-full border border-slate-100 shadow-inner">
-                                    <span class="text-3xl font-black text-emerald-600">${overallProgressPercent}%</span>
-                                    <span class="absolute bottom-4 text-[10px] text-gray-400 font-bold uppercase">Selesai</span>
-                                </div>
-                                <p class="text-xs font-bold text-slate-600 mt-4">${actualFilledEntries} daripada ${totalRequiredEntries} rekod diisi</p>
-                            </div>
-
-                            <div class="w-full bg-slate-100 rounded-full h-2">
-                                <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${overallProgressPercent}%"></div>
-                            </div>
-                        </div>
-
-                        <!-- Pecahan Status Progres Subjek -->
-                        <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-4">
-                            <h4 class="font-bold text-slate-800 text-base flex items-center gap-2">
-                                <i data-lucide="list-checks" class="text-emerald-600 w-5 h-5"></i> Status Progres Mengikut Subjek
-                            </h4>
-                            
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[250px] overflow-y-auto pr-1">
-                                ${subjectProgressList.map(sub => `
-                                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
-                                        <div class="flex justify-between items-start">
-                                            <p class="font-bold text-slate-700 text-xs truncate max-w-[150px]">${sub.name}</p>
-                                            ${sub.badge}
-                                        </div>
-                                        <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                                            <span>Progres</span>
-                                            <span>${sub.percent}%</span>
-                                        </div>
-                                        <div class="w-full bg-slate-200 rounded-full h-1">
-                                            <div class="bg-emerald-500 h-1 rounded-full" style="width: ${sub.percent}%"></div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-2xl shadow-sm border border-emerald-50 overflow-hidden">
-                        <div class="p-6 border-b border-emerald-50 bg-emerald-50/10 flex justify-between items-center">
-                            <h4 class="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <i data-lucide="award" class="text-emerald-600 w-5 h-5"></i> Kedudukan Prestasi Murid Kelas (${targetClass})
-                            </h4>
-                            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm">
-                                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Analisis Kelas
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left min-w-[800px]">
-                                <thead>
-                                    <tr class="bg-slate-50 text-slate-700 text-xs uppercase font-bold border-b border-slate-100">
-                                        <th class="p-4 text-center w-12">No.</th>
-                                        <th class="p-4">Nama Penuh Murid</th>
-                                        ${subjects.slice(0, 4).map(s => `<th class="p-4 text-center">${s}</th>`).join('')}
-                                        <th class="p-4 text-center bg-emerald-50/20">Purata (%)</th>
-                                        <th class="p-4 text-center">Gred Am</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${studentsRows}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>`;
+                container.innerHTML = renderComprehensiveMonitoringTable(false);
             }
 
-            // 4. DATA MURID & HALAMAN PENGURUSAN MUAT NAIK (ADMIN ONLY VIEW - DIPERBAIK DENGAN BUTANG PADAM)
+            // 4. DATA MURID (ADMIN ONLY)
             else if (currentPage === 'data_murid') {
                 let rows = students.map(s => `
                     <tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
@@ -1224,72 +1328,9 @@
                 </div>`;
             }
 
-            // 5. LAPORAN UASA (ADMIN VIEW)
+            // 5. LAPORAN UASA & PEMANTAUAN PUKAL (ADMIN MONITORING VIEW)
             else if (currentPage === 'laporan_uasa') {
-                const filteredStudents = students.filter(s => s.kelas === selectedClass);
-                let headerSubjectsHTML = subjects.slice(0, 5).map(sub => `<th class="p-4 text-center text-xs">${sub}</th>`).join('');
-
-                let rows = filteredStudents.map(s => {
-                    let subjectCells = subjects.slice(0, 5).map(sub => {
-                        const score = studentMarks[`${s.id}_${selectedYear}_${selectedAssessment}_${sub}`];
-                        if (score === undefined) {
-                            return `<td class="p-4 text-center text-gray-400 font-medium italic">-</td>`;
-                        }
-                        const gradeInfo = calculateUASAGrade(score);
-                        return `
-                        <td class="p-4 text-center">
-                            <span class="block text-sm font-bold text-gray-800">${score}%</span>
-                            <span class="text-[10px] font-black px-1.5 py-0.5 rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
-                        </td>`;
-                    }).join('');
-
-                    return `
-                    <tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
-                        <td class="p-4 text-sm font-bold text-gray-800 uppercase">${s.nama}</td>
-                        ${subjectCells}
-                    </tr>`;
-                }).join('');
-
-                if (rows.length === 0) {
-                    rows = `<tr><td colspan="${subjects.length + 1}" class="p-8 text-center text-gray-400 font-medium">Tiada rekod murid bagi kelas terpilih.</td></tr>`;
-                }
-
-                container.innerHTML = `
-                <div class="space-y-6">
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 flex flex-wrap gap-4 items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Pilih Kelas Laporan:</label>
-                            <select id="sel-class" onchange="selectedClass = this.value; renderPage()" class="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold outline-none cursor-pointer">
-                                ${classes.map(cls => `<option value="${cls}" ${selectedClass === cls ? 'selected' : ''}>${cls}</option>`).join('')}
-                            </select>
-                        </div>
-                        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md">
-                            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan Kelas
-                        </button>
-                    </div>
-
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <h4 class="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <i data-lucide="grid" class="text-slate-600 w-5 h-5"></i> Transkrip Keputusan Utama (${selectedClass})
-                            </h4>
-                            <span class="text-xs font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-full uppercase">SKBT</span>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left min-w-[750px]">
-                                <thead>
-                                    <tr class="bg-slate-50 text-slate-700 text-xs uppercase font-bold border-b border-slate-100">
-                                        <th class="p-4">Nama Murid</th>
-                                        ${headerSubjectsHTML}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rows}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>`;
+                container.innerHTML = renderComprehensiveMonitoringTable(true);
             }
 
             // 6. TETAPAN (SETTINGS)
@@ -1318,7 +1359,7 @@
             lucide.createIcons();
         }
 
-        // --- REALTIME SCORE & GRADE CALCULATIONS (UTAMAKAN VISUAL) ---
+        // --- REALTIME SCORE & GRADE CALCULATIONS ---
         function updateRowGrade(inputElement, studentId) {
             const rawScore = inputElement.value.trim();
             const rowElement = inputElement.closest('tr');
