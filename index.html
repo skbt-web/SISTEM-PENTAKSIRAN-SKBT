@@ -7,11 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .hidden { display: none; }
         #sidebar {
-            transition: transform 0.3s ease-in-out;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         @media (max-width: 1024px) {
             #sidebar.closed {
@@ -66,6 +66,7 @@
 
     <!-- MAIN APP LAYOUT -->
     <div id="app-container" class="hidden min-h-screen flex">
+        <!-- Sidebar Hamburger Overlay -->
         <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
 
         <!-- Sidebar -->
@@ -77,6 +78,7 @@
                     </div>
                     <span class="font-bold text-gray-800 text-lg uppercase leading-tight">SK Bukit<br/>Tongkat</span>
                 </div>
+                <!-- Hamburger Menu Close Button (Mobile Only) -->
                 <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
                     <i data-lucide="x"></i>
                 </button>
@@ -104,8 +106,9 @@
         <main class="flex-grow flex flex-col h-screen w-full min-w-0">
             <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30">
                 <div class="flex items-center gap-3">
-                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <i data-lucide="menu"></i>
+                    <!-- Hamburger Menu Toggle Button -->
+                    <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-all focus:outline-none">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
                     </button>
                     <h2 id="page-title" class="font-bold text-gray-800 text-lg md:text-xl capitalize truncate">Dashboard</h2>
                 </div>
@@ -354,6 +357,7 @@
             renderPage();
         }
 
+        // Expanded/Improved Hamburger logic (both side slide & overlay trigger correctly)
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -578,17 +582,15 @@
                 </div>`;
             }
 
-            // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA - UTAMAKAN INI)
+            // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA - REKA BENTUK DIPERBARUI)
             else if (currentPage === 'pengisian_markah') {
                 const filteredStudents = students.filter(s => s.kelas === selectedClass);
 
                 let rowsHTML = filteredStudents.map(s => {
                     const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
                     const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
-                    const pbd = studentPBD[key] !== undefined ? studentPBD[key] : 'TP3'; // Default to TP3 if empty
+                    const pbd = studentPBD[key] !== undefined ? studentPBD[key] : 'TP3'; 
                     const gradeInfo = calculateUASAGrade(mark);
-                    
-                    // Markah keseluruhan adalah salinan format markah atau gabungan (skor bertulis)
                     const totalMark = mark !== '' ? `${mark}/100` : '-';
 
                     return `
@@ -631,52 +633,103 @@
 
                 container.innerHTML = `
                 <div class="space-y-6">
-                    <!-- DROPDOWN CONTROLS (1-5) -->
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 space-y-4">
-                        <div class="border-b border-gray-100 pb-2 flex items-center gap-2">
-                            <i data-lucide="sliders-horizontal" class="text-emerald-600 w-5 h-5"></i>
-                            <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wider">Pemilihan Parameter Pentaksiran</h3>
+                    <!-- DROPDOWN CONTROLS - RE-STRUCTURED FLOW LAYOUT -->
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100/80 space-y-5">
+                        <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="bg-emerald-500/10 p-2 rounded-xl text-emerald-600">
+                                    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wider">Pemilihan Parameter Pentaksiran</h3>
+                                    <p class="text-xs text-gray-400 font-medium">Sila tentukan parameter penapis secara turutan dari kiri ke kanan</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+                        <!-- Step-by-Step Flow Grid Layout (1-5) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                            
                             <!-- 1. TAHUN -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">1. Tahun Akademik</label>
-                                <select id="sel-year" onchange="handleFilterChange()" class="w-full bg-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                                    ${years.map(y => `<option value="${y}" ${selectedYear === y ? 'selected' : ''}>Sesi ${y}</option>`).join('')}
-                                </select>
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">1</span>
+                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tahun Akademik</span>
+                                </div>
+                                <div class="relative">
+                                    <select id="sel-year" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
+                                        ${years.map(y => `<option value="${y}" ${selectedYear === y ? 'selected' : ''}>Sesi ${y}</option>`).join('')}
+                                    </select>
+                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 2. PILIHAN KELAS -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">2. Pilihan Kelas</label>
-                                <select id="sel-class" onchange="handleFilterChange()" class="w-full bg-emerald-600 text-white rounded-xl px-3 py-2.5 text-xs font-bold outline-none border-none focus:ring-2 focus:ring-emerald-300 cursor-pointer">
-                                    ${classes.map(c => `<option value="${c}" ${selectedClass === c ? 'selected' : ''}>${c}</option>`).join('')}
-                                </select>
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">2</span>
+                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pilihan Kelas</span>
+                                </div>
+                                <div class="relative">
+                                    <select id="sel-class" onchange="handleFilterChange()" class="w-full bg-emerald-600 text-white rounded-xl px-3 py-2.5 text-xs font-bold outline-none border-none focus:ring-2 focus:ring-emerald-300 cursor-pointer appearance-none">
+                                        ${classes.map(c => `<option value="${c}" ${selectedClass === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-emerald-100">
+                                        <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 3. JENIS UJIAN -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">3. Jenis Ujian</label>
-                                <select id="sel-test" onchange="handleFilterChange()" class="w-full bg-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                                    ${assessments.map(t => `<option value="${t}" ${selectedAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                </select>
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">3</span>
+                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Jenis Ujian</span>
+                                </div>
+                                <div class="relative">
+                                    <select id="sel-test" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
+                                        ${assessments.map(t => `<option value="${t}" ${selectedAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                    </select>
+                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 4. SUBJEK -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">4. Subjek Mata Pelajaran</label>
-                                <select id="sel-subject" onchange="handleFilterChange()" class="w-full bg-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                                    ${subjects.map(s => `<option value="${s}" ${selectedSubject === s ? 'selected' : ''}>${s}</option>`).join('')}
-                                </select>
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">4</span>
+                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Subjek Matapelajaran</span>
+                                </div>
+                                <div class="relative">
+                                    <select id="sel-subject" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
+                                        ${subjects.map(s => `<option value="${s}" ${selectedSubject === s ? 'selected' : ''}>${s}</option>`).join('')}
+                                    </select>
+                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                                        <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 5. NAMA GURU -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">5. Nama Guru Pemeriksa</label>
-                                <select id="sel-teacher" onchange="handleFilterChange()" class="w-full bg-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                                    ${teachers.map(t => `<option value="${t}" ${selectedTeacher === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                </select>
+                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">5</span>
+                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nama Guru Pemeriksa</span>
+                                </div>
+                                <div class="relative">
+                                    <select id="sel-teacher" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
+                                        ${teachers.map(t => `<option value="${t}" ${selectedTeacher === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                    </select>
+                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                                        <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                </div>
                             </div>
+
                         </div>
                     </div>
 
@@ -762,7 +815,7 @@
                     let totalStudentMarks = 0;
                     let subjectCount = 0;
                     
-                    subjects.slice(0, 4).forEach(subject => { // Ambil 4 subjek utama untuk paparan ringkasan
+                    subjects.slice(0, 4).forEach(subject => { 
                         const score = studentMarks[`${student.id}_${selectedYear}_${selectedAssessment}_${subject}`];
                         if (score !== undefined) {
                             totalStudentMarks += score;
@@ -1045,13 +1098,11 @@
             
             const gradeInfo = calculateUASAGrade(rawScore);
 
-            // Kemas kini komponen UI Gred secara langsung
             if (gradeSpan) {
                 gradeSpan.className = `row-grade px-3 py-1.5 rounded-full text-xs font-extrabold border ${gradeInfo.color}`;
                 gradeSpan.innerText = `${gradeInfo.grade} (${gradeInfo.label})`;
             }
 
-            // Kemas kini lajur Markah Keseluruhan secara langsung
             if (totalCell) {
                 totalCell.innerText = rawScore !== '' ? `${rawScore}/100` : '-';
             }
