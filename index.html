@@ -104,7 +104,7 @@
         <main class="flex-grow flex flex-col h-screen w-full min-w-0">
             <header class="h-16 bg-white border-b border-emerald-100 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-30">
                 <div class="flex items-center gap-3">
-                    <!-- Sidebar Toggle Button (Gantikan Hamburger Menu) -->
+                    <!-- Sidebar Toggle Button -->
                     <button onclick="toggleSidebar()" class="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 px-3 border border-emerald-200" title="Togol Bar Sisi">
                         <i data-lucide="panel-left" class="w-5 h-5"></i>
                         <span class="text-xs font-bold uppercase tracking-wider hidden sm:inline">Menu</span>
@@ -565,19 +565,6 @@
                             <p class="text-[10px] text-gray-400 mt-3 font-semibold">Uptime 100%</p>
                         </div>
                     </div>
-
-                    <!-- Spreadsheet URL Info Banner -->
-                    <div class="bg-teal-50 border border-teal-200 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div class="space-y-1">
-                            <h4 class="font-bold text-teal-900 text-sm flex items-center gap-2">
-                                <i data-lucide="link" class="w-4 h-4"></i> Integrasi Google Spreadsheet
-                            </h4>
-                            <p class="text-xs text-teal-800">Sistem diprogram khas untuk menarik dan sepadan dengan struktur pangkalan data Pentaksiran Sumatif 1.</p>
-                        </div>
-                        <a href="https://docs.google.com/spreadsheets/d/1hAcbVl9QiH31dJSKiZSPXI741DenFjfPucSinQLUVO8/edit?gid=1426370246#gid=1426370246" target="_blank" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
-                            Pautan Spreadsheet <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                        </a>
-                    </div>
                 </div>`;
             }
 
@@ -762,11 +749,6 @@
                                 <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">
                                     Sesi Akademik: ${selectedYear} | Kelas: ${selectedClass} | Ujian: ${selectedAssessment} | Guru: ${selectedTeacher}
                                 </p>
-                            </div>
-                            <div class="shrink-0 flex items-center gap-2">
-                                <a href="https://docs.google.com/spreadsheets/d/1hAcbVl9QiH31dJSKiZSPXI741DenFjfPucSinQLUVO8/edit?gid=1426370246#gid=1426370246" target="_blank" class="bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-4 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all">
-                                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-teal-600"></i> Rujukan Spreadsheet Asal
-                                </a>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
