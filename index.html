@@ -719,13 +719,22 @@
                         </div>
                     </div>
 
-                    <!-- CONTROL BUTTONS ABOVE TABLE (Only data locking controls remain) -->
+                    <!-- CONTROL BUTTONS ABOVE TABLE -->
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex items-center gap-3">
                             <span class="text-xs font-bold text-slate-500 uppercase">Status Penguncian Data:</span>
                             <button onclick="toggleEditMode()" class="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm ${isEditMode ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300' : 'bg-slate-800 text-white hover:bg-slate-900'}">
                                 <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
                                 ${isEditMode ? 'Buka Kunci (Edit Aktif)' : 'Kunci Grid (Paparan Sahaja)'}
+                            </button>
+                        </div>
+                        <!-- Satu Butang Save dan Satu Butang Hantar -->
+                        <div class="flex items-center gap-2">
+                            <button onclick="saveMarks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
+                                <i data-lucide="save" class="w-4 h-4"></i> Simpan Rekod (Save)
+                            </button>
+                            <button onclick="hantarKeGuruKelas()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
+                                <i data-lucide="send" class="w-4 h-4"></i> Hantar ke Dashboard Guru Kelas
                             </button>
                         </div>
                     </div>
