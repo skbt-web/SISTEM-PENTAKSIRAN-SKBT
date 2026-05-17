@@ -176,7 +176,7 @@
             'MOHD FAEIZ BIN SANUSI', 'KHAIRULAZMAN BIN DOLLAH', 'ZULKARNAIN BINM. AYOB',
             'MOHD NOOR RASHID BIN WAGIMAN', 'MOHD HIJRAN BIN AHMAD IDRUS', 'MUZAFFAR AHMAD BIN ZAINAL ABIDIN',
             'NORSAADAH BINTI JAILANI', 'NORMAZIDA BINTI AHMAD', 'RUMINI BINTI TUKIMAN',
-            'PSPA LAILA BINTI OTHMAN', 'NORAZLINAWATI BINTI MAHMOOD', 'NURUL NAJIHAH BINTI SAHLAN',
+            'PSPA LAILA BINTI OTHMAN', 'NORAZLINAWATI BINTI MAHMOOM', 'NURUL NAJIHAH BINTI SAHLAN',
             'ADLIN FAZLINDA BINTI ASNAN', 'SYAHMINA WARDAH BINTI SUARDI', 'ROSELINDA BINTI LAZIM',
             'DAYANG NURFARAHAIN FAEEZA BINTI HASSIM', 'NORZAIMAH BINTI ZAKARIA', 'RAZIDAH BINTI MOHAMAD',
             'NOOR HASLINDA BT. MOHD NASIRAN', 'SITI NOOR FAKHARIYAH BINTI MD SHAHID', 'VEETIYAH A/P SUROMUTHU'
@@ -719,22 +719,13 @@
                         </div>
                     </div>
 
-                    <!-- CONTROL BUTTONS ABOVE TABLE -->
+                    <!-- CONTROL BUTTONS ABOVE TABLE (Only data locking controls remain) -->
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex items-center gap-3">
                             <span class="text-xs font-bold text-slate-500 uppercase">Status Penguncian Data:</span>
                             <button onclick="toggleEditMode()" class="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm ${isEditMode ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300' : 'bg-slate-800 text-white hover:bg-slate-900'}">
                                 <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
                                 ${isEditMode ? 'Buka Kunci (Edit Aktif)' : 'Kunci Grid (Paparan Sahaja)'}
-                            </button>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <button onclick="saveMarks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                <i data-lucide="save" class="w-4 h-4"></i> Simpan Rekod (Save)
-                            </button>
-                            <button onclick="hantarKeGuruKelas()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                <i data-lucide="send" class="w-4 h-4"></i> Hantar ke Dashboard Guru Kelas
                             </button>
                         </div>
                     </div>
@@ -770,14 +761,6 @@
                         </div>
                         <div class="p-6 bg-slate-50 border-t border-gray-100 flex justify-between items-center">
                             <p class="text-xs text-slate-500 font-semibold">SK Bukit Tongkat (Kementerian Pendidikan Malaysia)</p>
-                            <div class="flex gap-2">
-                                <button onclick="saveMarks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                    <i data-lucide="save" class="w-4 h-4"></i> Simpan Pemarkahan
-                                </button>
-                                <button onclick="hantarKeGuruKelas()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                    <i data-lucide="send" class="w-4 h-4"></i> Hantar Data Keputusan
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>`;
