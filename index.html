@@ -591,6 +591,30 @@
             reader.readAsText(file);
         }
 
+        // --- DELETE STUDENT FUNCTION ---
+        function deleteStudent(id) {
+            const idx = students.findIndex(s => s.id === id);
+            if (idx !== -1) {
+                const studentName = students[idx].nama;
+                students.splice(idx, 1);
+                
+                // Padam segala markah dan keputusan PBD yang berkaitan
+                for (const key in studentMarks) {
+                    if (key.startsWith(`${id}_`)) {
+                        delete studentMarks[key];
+                    }
+                }
+                for (const key in studentPBD) {
+                    if (key.startsWith(`${id}_`)) {
+                        delete studentPBD[key];
+                    }
+                }
+                
+                showToast(`Murid [${studentName}] telah berjaya dipadamkan (pindah) daripada pangkalan data SMM.`, 'info');
+                renderPage();
+            }
+        }
+
         // --- RENDER PAGE CONTENT ---
         function renderPage() {
             const container = document.getElementById('page-content');
@@ -1096,7 +1120,7 @@
                 </div>`;
             }
 
-            // 4. DATA MURID & HALAMAN PENGURUSAN MUAT NAIK (ADMIN ONLY VIEW - DIPERBAIK)
+            // 4. DATA MURID & HALAMAN PENGURUSAN MUAT NAIK (ADMIN ONLY VIEW - DIPERBAIK DENGAN BUTANG PADAM)
             else if (currentPage === 'data_murid') {
                 let rows = students.map(s => `
                     <tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
@@ -1104,6 +1128,11 @@
                         <td class="p-4 text-sm font-semibold text-gray-700 uppercase">${s.nama}</td>
                         <td class="p-4 text-sm font-semibold text-slate-500 font-mono">${s.ic}</td>
                         <td class="p-4 text-sm font-semibold text-slate-500">${s.kelas}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="deleteStudent(${s.id})" class="text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-all border border-transparent hover:border-rose-100" title="Padam Murid (Pindah)">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
                     </tr>
                 `).join('');
 
@@ -1183,6 +1212,7 @@
                                         <th class="p-4">Nama Penuh</th>
                                         <th class="p-4">No. Kad Pengenalan</th>
                                         <th class="p-4">Kelas</th>
+                                        <th class="p-4 text-right">Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
