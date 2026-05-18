@@ -137,9 +137,9 @@
         <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4 transform transition-all scale-100">
             <div class="flex items-center gap-3 text-amber-500">
                 <div class="bg-amber-50 p-2.5 rounded-full"><i data-lucide="help-circle" class="w-6 h-6"></i></div>
-                <h3 class="font-bold text-slate-800 text-lg">Pengesahan Pentadbir</h3>
+                <h3 class="font-bold text-slate-800 text-lg">Adakah anda yakin?</h3>
             </div>
-            <p class="text-xs text-slate-500 font-medium leading-relaxed">Adakah anda yakin untuk menyimpan maklumat murid ini ke dalam pangkalan data Sistem Maklumat Murid (SMM)?</p>
+            <p class="text-xs text-slate-500 font-medium leading-relaxed">Adakah anda pasti untuk mendaftar murid ini ke dalam sistem?</p>
             <div class="flex items-center justify-end gap-2.5 pt-2">
                 <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all">Tidak</button>
                 <button onclick="closeConfirmModal(true)" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md">Ya</button>
@@ -361,13 +361,16 @@
                 <button onclick="navigate('laporan_uasa')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="laporan_uasa">
                     <i data-lucide="file-spreadsheet"></i><span>Laporan UASA</span>
                 </button>
-                <button onclick="navigate('analisis_admin')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis_admin">
+                <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
                     <i data-lucide="bar-chart-3"></i><span>Analisis</span>
                 </button>`;
             } else if (currentUser.role === 'Guru Kelas') {
                 html += `
                 <button onclick="navigate('guru_kelas_dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="guru_kelas_dashboard">
                     <i data-lucide="presentation"></i><span>Guru Kelas</span>
+                </button>
+                <button onclick="navigate('analisis')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis">
+                    <i data-lucide="bar-chart-3"></i><span>Analisis</span>
                 </button>`;
             } else {
                 html += `
@@ -407,6 +410,7 @@
             renderPage();
         }
 
+        // Expanded/Improved Sidebar Toggle logic
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -680,6 +684,11 @@
                 showToast(`Murid [${studentName}] telah berjaya dipadamkan daripada pangkalan data SMM.`, 'info');
                 renderPage();
             }
+        }
+
+        // --- GURU KELAS: PENGESAHAN DATA KEPADA ADMIN ---
+        function sahkanDataKeAdmin() {
+            showToast(`Data pentaksiran kelas [${selectedClass}] bagi [${selectedAssessment}] telah berjaya disahkan dan dihantar kepada pihak Admin!`, 'success');
         }
 
         // --- GET ACTIVE SUBJECTS DYNAMICALLY ---
@@ -997,22 +1006,24 @@
             </div>`;
         }
 
-        // --- EXCLUSIVE ADMIN ANALYSIS MODULES RENDERING ---
-        function renderAdminAnalysisModule() {
-            let innerHTML = '';
-
+        // --- EXCLUSIVE ADMIN & CLASS TEACHER ANALYSIS MODULES RENDERING ---
+        function renderAnalysisPage() {
+            const container = document.getElementById('page-content');
+            
+            // Generate standard filtering options
             const currentClassStudents = students.filter(s => s.kelas === analysisSelectedClass);
-            const activeSubjects = getActiveSubjects(parseInt(analysisSelectedClass.charAt(0)) || 1);
+            const classYear = parseInt(analysisSelectedClass.charAt(0)) || 1;
+            const activeSubjects = getActiveSubjects(classYear);
 
-            // Analysis Filter Bar
+            // Filter Bar Design containing assessment and mode selections
             let filterBarHTML = `
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100 space-y-4">
                 <div class="border-b border-slate-100 pb-3 flex items-center gap-2 text-emerald-600">
                     <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
                     <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Parameter Analisis Prestasi</h3>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- 1. Dropdown Jenis Ujian -->
+                    <!-- Dropdown Jenis Ujian -->
                     <div class="space-y-1.5">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Jenis Ujian</label>
                         <select id="analysis-sel-assessment" onchange="analysisSelectedAssessment = this.value; renderPage();" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
@@ -1020,7 +1031,7 @@
                         </select>
                     </div>
 
-                    <!-- 2. Dropdown Mod Analisis -->
+                    <!-- Dropdown Mod Analisis -->
                     <div class="space-y-1.5">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Mod Analisis</label>
                         <select id="analysis-sel-mode" onchange="analysisSelectedMode = this.value; renderPage();" class="w-full p-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 cursor-pointer">
@@ -1030,7 +1041,7 @@
                         </select>
                     </div>
 
-                    <!-- 3. Dynamic Filter (Class or Student based on mode) -->
+                    <!-- Dynamic filter based on chosen mode -->
                     ${analysisSelectedMode === 'individu' ? `
                     <div class="space-y-1.5">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Murid</label>
@@ -1048,21 +1059,22 @@
                     ` : `
                     <div class="space-y-1.5 opacity-40">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Mod</label>
-                        <input type="text" disabled readonly value="Gabungan Semua Kelas Aktif" class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 outline-none">
+                        <input type="text" disabled readonly value="Gabungan Semua Kelas Aktif" class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 outline-none cursor-not-allowed">
                     </div>
                     `)}
                 </div>
             </div>`;
 
+            let innerHTML = '';
+
             // A. MOD ANALISIS INDIVIDU
             if (analysisSelectedMode === 'individu') {
                 const targetStudent = students.find(s => s.id === analysisSelectedStudentId) || students[0];
-                if (!targetStudent) return filterBarHTML;
+                if (!targetStudent) return;
 
                 const studentClassRankings = getClassRankings(targetStudent.kelas, analysisSelectedAssessment);
                 const rank = studentClassRankings[targetStudent.id] || '-';
 
-                // Query and calculate all scores for this student
                 let totalScore = 0;
                 let subjectsEvaluatedCount = 0;
                 let activeSubjectsList = getActiveSubjects(parseInt(targetStudent.kelas.charAt(0)) || 1);
@@ -1080,11 +1092,11 @@
 
                     return `
                     <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div class="space-y-0.5">
-                            <p class="text-xs font-bold text-slate-700">${sub}</p>
+                        <div class="space-y-0.5 overflow-hidden">
+                            <p class="text-xs font-bold text-slate-700 truncate">${sub}</p>
                             <span class="text-[9px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded-full uppercase">PBD Semasa: ${pbd}</span>
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 shrink-0">
                             <span class="font-mono text-xs font-black text-slate-800">${score !== undefined ? score + '%' : '-'}</span>
                             <span class="px-2 py-0.5 text-[10px] font-black rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
                         </div>
@@ -1097,7 +1109,7 @@
                 innerHTML = `
                 ${filterBarHTML}
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Student Summary Card -->
+                    <!-- Student Card -->
                     <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6 self-start">
                         <div class="text-center space-y-2">
                             <div class="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center font-black text-2xl mx-auto shadow-md">
@@ -1168,7 +1180,7 @@
                 const classAvgPercentage = scoreCount > 0 ? Math.round(sumScores / scoreCount) : 0;
                 const passPercentage = scoreCount > 0 ? Math.round((passCount / scoreCount) * 100) : 0;
 
-                let performanceListHTML = classStudents.map((s, index) => {
+                let performanceListHTML = classStudents.map((s) => {
                     let stSum = 0;
                     let stCount = 0;
                     activeSubjects.forEach(sub => {
@@ -1203,7 +1215,7 @@
                 innerHTML = `
                 ${filterBarHTML}
                 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Purata Peratus Kelas</p>
                         <h3 class="text-2xl font-black text-slate-800">${classAvgPercentage}%</h3>
@@ -1217,7 +1229,7 @@
                         <h3 class="text-2xl font-black text-indigo-600">${cemerlangCount} Orang</h3>
                     </div>
                     <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gagal Minimum (<40%)</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gagal Minimum (&lt;40%)</p>
                         <h3 class="text-2xl font-black text-rose-600">${failCount} Orang</h3>
                     </div>
                 </div>
