@@ -132,6 +132,21 @@
         </main>
     </div>
 
+    <!-- CUSTOM CONFIRMATION MODAL -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4 transform transition-all scale-100">
+            <div class="flex items-center gap-3 text-amber-500">
+                <div class="bg-amber-50 p-2.5 rounded-full"><i data-lucide="help-circle" class="w-6 h-6"></i></div>
+                <h3 class="font-bold text-slate-800 text-lg">Pengesahan Pentadbir</h3>
+            </div>
+            <p class="text-xs text-slate-500 font-medium leading-relaxed">Adakah anda yakin untuk menyimpan maklumat murid ini ke dalam pangkalan data Sistem Maklumat Murid (SMM)?</p>
+            <div class="flex items-center justify-end gap-2.5 pt-2">
+                <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all">Tidak</button>
+                <button onclick="closeConfirmModal(true)" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md">Ya</button>
+            </div>
+        </div>
+    </div>
+
     <!-- NOTIFICATION TOAST -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
@@ -206,12 +221,12 @@
             '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 90,
             '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI DAN VISUAL': 82,
             '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 88, 
-            '14_2026_PENTAKSIRAN SUMATIF 1_SEJARAH': 84, // dummy for Tahun 6 Sejarah
+            '14_2026_PENTAKSIRAN SUMATIF 1_SEJARAH': 84,
 
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 55,
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 40,
             '15_2026_PENTAKSIRAN SUMATIF 1_SAINS': 33,
-            '15_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 0,
+            '15_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 10,
             
             '1_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 89,
             '1_2026_PENTAKSIRAN SUMATIF 1_MATEMATIK': 94,
@@ -242,6 +257,15 @@
         let selectedAssessment = 'PENTAKSIRAN SUMATIF 1';
         let selectedSubject = 'BAHASA MELAYU';
         let selectedTeacher = 'MAZUIN BINTI AHMAD KAMIL';
+
+        // Analisis Page States
+        let analysisSelectedAssessment = 'PENTAKSIRAN SUMATIF 1';
+        let analysisSelectedMode = 'individu'; // 'individu' | 'kelas' | 'gabungan_kelas'
+        let analysisSelectedStudentId = 14; 
+        let analysisSelectedClass = '6 AR-RAZI';
+
+        // Temp Manual Registration Pending Holder for Custom Modal
+        let pendingRegistrationData = null;
 
         // --- AUTH LOGIC ---
         function handleLogin(type) {
@@ -336,6 +360,9 @@
                 </button>
                 <button onclick="navigate('laporan_uasa')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="laporan_uasa">
                     <i data-lucide="file-spreadsheet"></i><span>Laporan UASA</span>
+                </button>
+                <button onclick="navigate('analisis_admin')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all" data-page="analisis_admin">
+                    <i data-lucide="bar-chart-3"></i><span>Analisis</span>
                 </button>`;
             } else if (currentUser.role === 'Guru Kelas') {
                 html += `
@@ -380,7 +407,6 @@
             renderPage();
         }
 
-        // Expanded/Improved Sidebar Toggle logic
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -462,8 +488,6 @@
         function handleFilterChange() {
             selectedYear = document.getElementById('sel-year').value;
             const newClass = document.getElementById('sel-class').value;
-            
-            // Check if RBT / SEJARAH should be reset in subject selection
             const newClassYear = parseInt(newClass.charAt(0)) || 1;
             selectedClass = newClass;
             
@@ -530,8 +554,8 @@
             showToast(`Kesemua data pentaksiran kelas [${targetClassVal}] bagi subjek [${selectedSubject}] telah dihantar secara rasmi ke Dashboard Guru Kelas!`, 'success');
         }
 
-        // --- ADMIN: MANUAL AND CSV UPLOAD PROCESSING ---
-        function handleManualRegister(event) {
+        // --- ADMIN: CUSTOM CONFIRMATION MODAL FOR MANUAL REGISTER ---
+        function handleManualRegisterSubmit(event) {
             event.preventDefault();
             const namaInput = document.getElementById('admin-reg-nama');
             const icInput = document.getElementById('admin-reg-ic');
@@ -553,15 +577,32 @@
                 return;
             }
 
-            const newId = students.length > 0 ? Math.max(...students.map(s => s.id)) + 1 : 1;
-            students.push({ id: newId, nama, ic, kelas });
+            // Simpan data sementara & tunjuk modal pengesahan kastam
+            pendingRegistrationData = { nama, ic, kelas };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
 
-            showToast(`Murid [${nama}] berjaya didaftarkan ke kelas ${kelas}!`, 'success');
+        function closeConfirmModal(isConfirmed) {
+            document.getElementById('confirm-modal').classList.add('hidden');
             
-            // Set semula input
-            namaInput.value = '';
-            icInput.value = '';
-            renderPage();
+            if (isConfirmed && pendingRegistrationData) {
+                const { nama, ic, kelas } = pendingRegistrationData;
+                const newId = students.length > 0 ? Math.max(...students.map(s => s.id)) + 1 : 1;
+                students.push({ id: newId, nama, ic, kelas });
+
+                showToast('Nama murid berjaya disimpan.', 'success');
+
+                // Kosongkan form
+                const namaInput = document.getElementById('admin-reg-nama');
+                const icInput = document.getElementById('admin-reg-ic');
+                if (namaInput) namaInput.value = '';
+                if (icInput) icInput.value = '';
+                
+                pendingRegistrationData = null;
+                renderPage();
+            } else {
+                pendingRegistrationData = null;
+            }
         }
 
         function handleCSVImport(event) {
@@ -571,17 +612,14 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const text = e.target.result;
-                // Pecahkan baris
                 const lines = text.split(/\r?\n/);
                 let successCount = 0;
                 let skipCount = 0;
 
                 lines.forEach((line, index) => {
-                    // Abaikan baris kosong
                     if (!line.trim()) return;
 
                     const cols = line.split(',');
-                    // Abaikan baris kepala (Header) jika sepadan
                     if (index === 0 && (line.toLowerCase().includes('nama') || line.toLowerCase().includes('ic') || line.toLowerCase().includes('kelas'))) {
                         return;
                     }
@@ -592,7 +630,6 @@
                         const kelas = cols[2].trim().toUpperCase();
 
                         if (nama && ic && kelas) {
-                            // Validasi adakah kelas ini wujud dalam senarai dibenarkan
                             if (classes.includes(kelas)) {
                                 const exists = students.some(s => s.ic === ic);
                                 if (!exists) {
@@ -620,7 +657,6 @@
                     showToast(`${skipCount} rekod diabaikan (format salah / kelas tidak sepadan / kad pengenalan pendua).`, 'warning');
                 }
 
-                // Reset file input
                 event.target.value = '';
                 renderPage();
             };
@@ -634,35 +670,21 @@
                 const studentName = students[idx].nama;
                 students.splice(idx, 1);
                 
-                // Padam segala markah dan keputusan PBD yang berkaitan
                 for (const key in studentMarks) {
-                    if (key.startsWith(`${id}_`)) {
-                        delete studentMarks[key];
-                    }
+                    if (key.startsWith(`${id}_`)) delete studentMarks[key];
                 }
                 for (const key in studentPBD) {
-                    if (key.startsWith(`${id}_`)) {
-                        delete studentPBD[key];
-                    }
+                    if (key.startsWith(`${id}_`)) delete studentPBD[key];
                 }
                 
-                showToast(`Murid [${studentName}] telah berjaya dipadamkan (pindah) daripada pangkalan data SMM.`, 'info');
+                showToast(`Murid [${studentName}] telah berjaya dipadamkan daripada pangkalan data SMM.`, 'info');
                 renderPage();
             }
         }
 
-        // --- GURU KELAS: PENGESAHAN DATA KEPADA ADMIN ---
-        function sahkanDataKeAdmin() {
-            showToast(`Data pentaksiran kelas [${selectedClass}] bagi [${selectedAssessment}] telah berjaya disahkan dan dihantar kepada pihak Admin!`, 'success');
-        }
-
         // --- GET ACTIVE SUBJECTS DYNAMICALLY ---
         function getActiveSubjects(classYear) {
-            // Tahun 4, 5, 6 mempunyai tambahan RBT dan SEJARAH (11 subjek)
-            // Tahun 1, 2, 3 hanya 9 subjek asas
             if (classYear >= 4) {
-                // Letak SEJARAH bersebelahan dengan BAHASA ARAB (indeks 6)
-                // baseSubjects asal: BM, BI, SN, MT, PI, BA, MZ, PJK, PSV
                 const active = [...baseSubjects];
                 const arabIndex = active.indexOf('BAHASA ARAB');
                 if (arabIndex !== -1) {
@@ -678,7 +700,7 @@
         }
 
         // --- CALCULATE CLASS RANKINGS IN-MEMORY ---
-        function getClassRankings(targetClass) {
+        function getClassRankings(targetClass, targetAssessment) {
             const classStudents = students.filter(s => s.kelas === targetClass);
             const classYear = parseInt(targetClass.charAt(0)) || 1;
             const activeSubjects = getActiveSubjects(classYear);
@@ -687,7 +709,7 @@
                 let totalMarks = 0;
                 let count = 0;
                 activeSubjects.forEach(sub => {
-                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    const key = `${s.id}_${selectedYear}_${targetAssessment}_${sub}`;
                     const score = studentMarks[key];
                     if (score !== undefined) {
                         totalMarks += score;
@@ -702,7 +724,6 @@
                 };
             });
 
-            // Susun berdasarkan peratus tertinggi, kemudian jumlah markah tertinggi
             performances.sort((a, b) => b.percentage - a.percentage || b.totalMarks - a.totalMarks);
 
             const rankings = {};
@@ -713,9 +734,9 @@
         }
 
         // --- DETAILED COMPREHENSIVE MONITORING TABLE FOR ADMIN & GURU KELAS ---
-        function renderComprehensiveMonitoringTable(isAdminView) {
+        function renderComprehensiveMonitoringTable(isAdminView, targetAssessment = selectedAssessment) {
             const classStudents = students.filter(s => s.kelas === selectedClass);
-            const classRankings = getClassRankings(selectedClass);
+            const classRankings = getClassRankings(selectedClass, targetAssessment);
             const classYear = parseInt(selectedClass.charAt(0)) || 1;
             const activeSubjects = getActiveSubjects(classYear);
 
@@ -726,7 +747,7 @@
             let subjectProgressList = activeSubjects.map(sub => {
                 let filledCount = 0;
                 classStudents.forEach(st => {
-                    const key = `${st.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    const key = `${st.id}_${selectedYear}_${targetAssessment}_${sub}`;
                     if (studentMarks[key] !== undefined) {
                         filledCount++;
                         actualFilledEntries++;
@@ -769,7 +790,7 @@
                 let count = 0;
 
                 let subjectCellsHTML = activeSubjects.map(sub => {
-                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${sub}`;
+                    const key = `${s.id}_${selectedYear}_${targetAssessment}_${sub}`;
                     const score = studentMarks[key];
                     const pbd = studentPBD[key] !== undefined ? studentPBD[key] : '-';
 
@@ -873,17 +894,15 @@
                         
                         <!-- Drop Kelas, Jenis Ujian, Cetak & Sahkan Data -->
                         <div class="flex flex-wrap items-center gap-3">
-                            <!-- Dropdown Jenis Ujian (Hanya untuk Guru Kelas Sahaja) -->
-                            ${!isAdminView ? `
+                            <!-- Dropdown Jenis Ujian -->
                             <div class="relative">
                                 <select id="sel-monitoring-assessment" onchange="selectedAssessment = this.value; renderPage();" class="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-4 py-2.5 text-xs font-bold border-none outline-none cursor-pointer appearance-none pr-8 shadow-md">
-                                    ${assessments.map(t => `<option value="${t}" ${selectedAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                    ${assessments.map(t => `<option value="${t}" ${targetAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
                                 </select>
                                 <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-white">
                                     <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
                                 </div>
                             </div>
-                            ` : ''}
 
                             <!-- Drop Kelas -->
                             <div class="relative">
@@ -978,426 +997,346 @@
             </div>`;
         }
 
-        // --- RENDER PAGE MAIN router ---
-        function renderPage() {
-            const container = document.getElementById('page-content');
+        // --- EXCLUSIVE ADMIN ANALYSIS MODULES RENDERING ---
+        function renderAdminAnalysisModule() {
+            let innerHTML = '';
 
-            // 1. DASHBOARD UTAMA
-            if (currentPage === 'dashboard') {
-                const totalStudents = students.length;
-                let activeSubmissions = 0;
-                let sumOfScores = 0;
+            const currentClassStudents = students.filter(s => s.kelas === analysisSelectedClass);
+            const activeSubjects = getActiveSubjects(parseInt(analysisSelectedClass.charAt(0)) || 1);
 
-                Object.keys(studentMarks).forEach(k => {
-                    activeSubmissions++;
-                    sumOfScores += studentMarks[k];
-                });
+            // Analysis Filter Bar
+            let filterBarHTML = `
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                <div class="border-b border-slate-100 pb-3 flex items-center gap-2 text-emerald-600">
+                    <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+                    <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Parameter Analisis Prestasi</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 1. Dropdown Jenis Ujian -->
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Jenis Ujian</label>
+                        <select id="analysis-sel-assessment" onchange="analysisSelectedAssessment = this.value; renderPage();" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                            ${assessments.map(t => `<option value="${t}" ${analysisSelectedAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                    </div>
 
-                const averageScore = activeSubmissions > 0 ? Math.round(sumOfScores / activeSubmissions) : 0;
+                    <!-- 2. Dropdown Mod Analisis -->
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Mod Analisis</label>
+                        <select id="analysis-sel-mode" onchange="analysisSelectedMode = this.value; renderPage();" class="w-full p-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 cursor-pointer">
+                            <option value="individu" ${analysisSelectedMode === 'individu' ? 'selected' : ''}>Analisis Individu</option>
+                            <option value="kelas" ${analysisSelectedMode === 'kelas' ? 'selected' : ''}>Analisis Kelas</option>
+                            <option value="gabungan_kelas" ${analysisSelectedMode === 'gabungan_kelas' ? 'selected' : ''}>Analisis Gabungan Kelas</option>
+                        </select>
+                    </div>
 
-                container.innerHTML = `
-                <div class="space-y-8">
-                    <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-8 rounded-3xl shadow-lg border border-emerald-500 relative overflow-hidden text-white">
-                        <div class="absolute top-0 right-0 p-8 text-white opacity-10">
-                            <i data-lucide="graduation-cap" style="width: 140px; height: 140px;"></i>
+                    <!-- 3. Dynamic Filter (Class or Student based on mode) -->
+                    ${analysisSelectedMode === 'individu' ? `
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Murid</label>
+                        <select id="analysis-sel-student" onchange="analysisSelectedStudentId = parseInt(this.value); renderPage();" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                            ${students.map(st => `<option value="${st.id}" ${analysisSelectedStudentId === st.id ? 'selected' : ''}>[${st.kelas}] ${st.nama}</option>`).join('')}
+                        </select>
+                    </div>
+                    ` : (analysisSelectedMode === 'kelas' ? `
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pilih Kelas</label>
+                        <select id="analysis-sel-class" onchange="analysisSelectedClass = this.value; renderPage();" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                            ${classes.map(cls => `<option value="${cls}" ${analysisSelectedClass === cls ? 'selected' : ''}>${cls}</option>`).join('')}
+                        </select>
+                    </div>
+                    ` : `
+                    <div class="space-y-1.5 opacity-40">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Mod</label>
+                        <input type="text" disabled readonly value="Gabungan Semua Kelas Aktif" class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 outline-none">
+                    </div>
+                    `)}
+                </div>
+            </div>`;
+
+            // A. MOD ANALISIS INDIVIDU
+            if (analysisSelectedMode === 'individu') {
+                const targetStudent = students.find(s => s.id === analysisSelectedStudentId) || students[0];
+                if (!targetStudent) return filterBarHTML;
+
+                const studentClassRankings = getClassRankings(targetStudent.kelas, analysisSelectedAssessment);
+                const rank = studentClassRankings[targetStudent.id] || '-';
+
+                // Query and calculate all scores for this student
+                let totalScore = 0;
+                let subjectsEvaluatedCount = 0;
+                let activeSubjectsList = getActiveSubjects(parseInt(targetStudent.kelas.charAt(0)) || 1);
+
+                let breakdownRows = activeSubjectsList.map(sub => {
+                    const key = `${targetStudent.id}_${selectedYear}_${analysisSelectedAssessment}_${sub}`;
+                    const score = studentMarks[key];
+                    const pbd = studentPBD[key] !== undefined ? studentPBD[key] : '-';
+                    const gradeInfo = calculateUASAGrade(score);
+
+                    if (score !== undefined) {
+                        totalScore += score;
+                        subjectsEvaluatedCount++;
+                    }
+
+                    return `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div class="space-y-0.5">
+                            <p class="text-xs font-bold text-slate-700">${sub}</p>
+                            <span class="text-[9px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded-full uppercase">PBD Semasa: ${pbd}</span>
                         </div>
-                        <div class="relative z-10 space-y-2">
-                            <span class="bg-emerald-500 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">SESI AKADEMIK 2026/2027</span>
-                            <h1 class="text-3xl font-black mb-1 tracking-tight">Selamat Datang, ${currentUser.fullName}</h1>
-                            <p class="opacity-90 max-w-xl text-sm leading-relaxed">
-                                Portal rasmi pengurusan markah pentaksiran & UASA SK Bukit Tongkat. Hubungi Pentadbir Sistem jika terdapat ralat kelayakan subjek.
-                            </p>
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono text-xs font-black text-slate-800">${score !== undefined ? score + '%' : '-'}</span>
+                            <span class="px-2 py-0.5 text-[10px] font-black rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const finalAvg = subjectsEvaluatedCount > 0 ? Math.round(totalScore / subjectsEvaluatedCount) : 0;
+                const finalGrade = calculateUASAGrade(finalAvg);
+
+                innerHTML = `
+                ${filterBarHTML}
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Student Summary Card -->
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6 self-start">
+                        <div class="text-center space-y-2">
+                            <div class="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center font-black text-2xl mx-auto shadow-md">
+                                ${targetStudent.nama.charAt(0)}
+                            </div>
+                            <h4 class="font-extrabold text-slate-800 text-sm uppercase leading-tight">${targetStudent.nama}</h4>
+                            <p class="text-[10px] font-mono font-bold text-slate-400">IC: ${targetStudent.ic}</p>
+                            <span class="inline-block bg-slate-100 text-slate-700 text-[10px] font-bold px-3 py-1 rounded-full">Kelas: ${targetStudent.kelas}</span>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-4 space-y-3">
+                            <div class="flex justify-between items-center text-xs font-bold text-slate-500">
+                                <span>Purata Peratus</span>
+                                <span class="text-emerald-600 font-black">${finalAvg}%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs font-bold text-slate-500">
+                                <span>Gred Am Pencapaian</span>
+                                <span class="px-2 py-0.5 font-black text-[10px] rounded border ${finalGrade.color}">${finalGrade.grade}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs font-bold text-slate-500">
+                                <span>Kedudukan dalam Kelas</span>
+                                <span class="text-indigo-600 font-black">No. ${rank} / ${students.filter(s => s.kelas === targetStudent.kelas).length}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Jumlah Murid Sistem</p>
-                                <div class="bg-emerald-50 p-2 rounded-lg text-emerald-600"><i data-lucide="users" class="w-5 h-5"></i></div>
-                            </div>
-                            <h3 class="text-3xl font-bold text-gray-800">${totalStudents} Orang</h3>
-                            <p class="text-xs text-gray-400 mt-2">Daftar Merentas Kelas</p>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Kemasukan Skor</p>
-                                <div class="bg-cyan-50 p-2 rounded-lg text-cyan-600"><i data-lucide="award" class="w-5 h-5"></i></div>
-                            </div>
-                            <h3 class="text-3xl font-bold text-gray-800">${activeSubmissions} Rekod</h3>
-                            <p class="text-xs text-emerald-600 font-semibold mt-2">Purata Markah Am: ${averageScore}%</p>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Gred Purata Sekolah (GPS)</p>
-                                <div class="bg-amber-50 p-2 rounded-lg text-amber-600"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
-                            </div>
-                            <h3 class="text-3xl font-bold text-gray-800">C (MEMUASKAN)</h3>
-                            <div class="w-full bg-gray-100 rounded-full h-1.5 mt-3">
-                                <div class="bg-amber-500 h-1.5 rounded-full animate-pulse" style="width: 58%"></div>
-                            </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-50 hover:shadow-md transition-all">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Kestabilan Platform</p>
-                                <div class="bg-emerald-50 p-2 rounded-lg text-emerald-600"><i data-lucide="radio" class="w-5 h-5"></i></div>
-                            </div>
-                            <div class="flex items-center gap-2 mt-1">
-                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></div>
-                                <h3 class="text-xl font-bold text-emerald-600">Terjamin (Online)</h3>
-                            </div>
-                            <p class="text-[10px] text-gray-400 mt-3 font-semibold">Uptime 100%</p>
+                    <!-- Breakdown Subject List -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                        <h4 class="font-bold text-slate-800 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">Helaian Gred Pentaksiran Subjek</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            ${breakdownRows}
                         </div>
                     </div>
                 </div>`;
             }
 
-            // 2. PAPAN PENGISIAN MARKAH (DASHBOARD GURU SAHAJA)
-            else if (currentPage === 'pengisian_markah') {
-                const filteredStudents = students.filter(s => s.kelas === selectedClass);
-                const classYear = parseInt(selectedClass.charAt(0)) || 1;
-                const activeSubjectsForClass = getActiveSubjects(classYear);
+            // B. MOD ANALISIS KELAS
+            else if (analysisSelectedMode === 'kelas') {
+                const classStudents = students.filter(s => s.kelas === analysisSelectedClass);
+                let classRankings = getClassRankings(analysisSelectedClass, analysisSelectedAssessment);
 
-                let rowsHTML = filteredStudents.map(s => {
-                    const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
-                    const mark = studentMarks[key] !== undefined ? studentMarks[key] : '';
-                    const pbd = studentPBD[key] !== undefined ? studentPBD[key] : 'TP3'; 
-                    const gradeInfo = calculateUASAGrade(mark);
-                    const totalMark = mark !== '' ? `${mark}/100` : '-';
+                let sumScores = 0;
+                let scoreCount = 0;
+                let passCount = 0;
+                let failCount = 0;
+                let cemerlangCount = 0;
+
+                classStudents.forEach(st => {
+                    let stSum = 0;
+                    let stCount = 0;
+                    activeSubjects.forEach(sub => {
+                        const key = `${st.id}_${selectedYear}_${analysisSelectedAssessment}_${sub}`;
+                        const score = studentMarks[key];
+                        if (score !== undefined) {
+                            stSum += score;
+                            stCount++;
+                        }
+                    });
+                    if (stCount > 0) {
+                        const avg = Math.round(stSum / stCount);
+                        sumScores += avg;
+                        scoreCount++;
+                        if (avg >= 40) passCount++; else failCount++;
+                        if (avg >= 82) cemerlangCount++;
+                    }
+                });
+
+                const classAvgPercentage = scoreCount > 0 ? Math.round(sumScores / scoreCount) : 0;
+                const passPercentage = scoreCount > 0 ? Math.round((passCount / scoreCount) * 100) : 0;
+
+                let performanceListHTML = classStudents.map((s, index) => {
+                    let stSum = 0;
+                    let stCount = 0;
+                    activeSubjects.forEach(sub => {
+                        const key = `${s.id}_${selectedYear}_${analysisSelectedAssessment}_${sub}`;
+                        const score = studentMarks[key];
+                        if (score !== undefined) {
+                            stSum += score;
+                            stCount++;
+                        }
+                    });
+                    const avg = stCount > 0 ? Math.round(stSum / stCount) : 0;
+                    const gradeInfo = calculateUASAGrade(avg);
+                    const rank = classRankings[s.id] || '-';
 
                     return `
-                    <tr class="student-row hover:bg-slate-50 border-b border-gray-100 transition-colors" data-id="${s.id}">
-                        <td class="p-4 text-sm font-bold text-gray-800 uppercase">${s.nama}</td>
-                        <td class="p-4 text-sm font-semibold text-slate-500 font-mono">${s.ic}</td>
+                    <tr class="hover:bg-slate-50/50 border-b border-slate-100 transition-colors">
+                        <td class="p-4 text-xs font-bold text-slate-700">${rank}</td>
+                        <td class="p-4 text-xs font-bold text-slate-800 uppercase">${s.nama}</td>
+                        <td class="p-4 text-xs font-mono font-bold text-slate-400">${s.ic}</td>
+                        <td class="p-4 text-center font-mono text-xs font-black text-slate-800">${stSum}</td>
+                        <td class="p-4 text-center font-mono text-xs font-black text-emerald-600 bg-emerald-50/20">${avg}%</td>
                         <td class="p-4 text-center">
-                            <input type="number" 
-                                   min="0" max="100" 
-                                   value="${mark}"
-                                   ${!isEditMode ? 'disabled' : ''}
-                                   class="mark-input w-24 p-2 text-center bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none font-black text-gray-800 transition-all ${!isEditMode ? 'cursor-not-allowed opacity-60' : ''}" 
-                                   placeholder="0 - 100"
-                                   oninput="updateRowGrade(this, ${s.id})">
-                        </td>
-                        <td class="p-4 text-center">
-                            <span class="row-grade px-3 py-1.5 rounded-full text-xs font-extrabold border ${gradeInfo.color}">
-                                ${gradeInfo.grade} (${gradeInfo.label})
-                            </span>
-                        </td>
-                        <td class="p-4 text-center">
-                            <select ${!isEditMode ? 'disabled' : ''} class="pbd-select p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500 ${!isEditMode ? 'cursor-not-allowed opacity-60' : ''}">
-                                <option value="TP1" ${pbd === 'TP1' ? 'selected' : ''}>TP1</option>
-                                <option value="TP2" ${pbd === 'TP2' ? 'selected' : ''}>TP2</option>
-                                <option value="TP3" ${pbd === 'TP3' ? 'selected' : ''}>TP3</option>
-                                <option value="TP4" ${pbd === 'TP4' ? 'selected' : ''}>TP4</option>
-                                <option value="TP5" ${pbd === 'TP5' ? 'selected' : ''}>TP5</option>
-                                <option value="TP6" ${pbd === 'TP6' ? 'selected' : ''}>TP6</option>
-                            </select>
-                        </td>
-                        <td class="p-4 text-center text-sm font-black text-emerald-700 bg-emerald-50/20 font-mono row-total">
-                            ${totalMark}
+                            <span class="px-2 py-0.5 text-[9px] font-black rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
                         </td>
                     </tr>`;
                 }).join('');
 
-                if (rowsHTML.length === 0) {
-                    rowsHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400 font-bold italic">Tiada data murid ditemui bagi Kelas ${selectedClass}. Sila pastikan Admin telah mendaftarkan murid bagi kelas ini.</td></tr>`;
+                if (performanceListHTML.length === 0) {
+                    performanceListHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400 font-bold italic">Tiada murid berdaftar dalam kelas ini.</td></tr>`;
                 }
 
-                container.innerHTML = `
-                <div class="space-y-6">
-                    <!-- DROPDOWN CONTROLS - RE-STRUCTURED FLOW LAYOUT -->
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100/80 space-y-5">
-                        <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <div class="bg-emerald-500/10 p-2 rounded-xl text-emerald-600">
-                                    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wider">Pemilihan Parameter Pentaksiran</h3>
-                                    <p class="text-xs text-gray-400 font-medium">Sila tentukan parameter penapis secara turutan dari kiri ke kanan</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Step-by-Step Flow Grid Layout (1-5) -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-                            
-                            <!-- 1. TAHUN -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">1</span>
-                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tahun Akademik</span>
-                                </div>
-                                <div class="relative">
-                                    <select id="sel-year" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
-                                        ${years.map(y => `<option value="${y}" ${selectedYear === y ? 'selected' : ''}>Sesi ${y}</option>`).join('')}
-                                    </select>
-                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-                                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 2. PILIHAN KELAS -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">2</span>
-                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pilihan Kelas</span>
-                                </div>
-                                <div class="relative">
-                                    <select id="sel-class" onchange="handleFilterChange()" class="w-full bg-emerald-600 text-white rounded-xl px-3 py-2.5 text-xs font-bold outline-none border-none focus:ring-2 focus:ring-emerald-300 cursor-pointer appearance-none">
-                                        ${classes.map(c => `<option value="${c}" ${selectedClass === c ? 'selected' : ''}>${c}</option>`).join('')}
-                                    </select>
-                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-emerald-100">
-                                        <i data-lucide="users" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 3. JENIS UJIAN -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">3</span>
-                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Jenis Ujian</span>
-                                </div>
-                                <div class="relative">
-                                    <select id="sel-test" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
-                                        ${assessments.map(t => `<option value="${t}" ${selectedAssessment === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                    </select>
-                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 4. SUBJEK -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">4</span>
-                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Subjek Matapelajaran</span>
-                                </div>
-                                <div class="relative">
-                                    <!-- Menu dropdown subjek dinamik mengikut Tahun Kelas -->
-                                    <select id="sel-subject" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
-                                        ${activeSubjectsForClass.map(s => `<option value="${s}" ${selectedSubject === s ? 'selected' : ''}>${s}</option>`).join('')}
-                                    </select>
-                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-                                        <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 5. NAMA GURU -->
-                            <div class="bg-slate-50/50 p-4 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all space-y-3 shadow-sm">
-                                <div class="flex items-center gap-2">
-                                    <span class="flex items-center justify-center bg-emerald-500 text-white text-[11px] font-black w-5 h-5 rounded-full shadow-sm">5</span>
-                                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nama Guru Pemeriksa</span>
-                                </div>
-                                <div class="relative">
-                                    <select id="sel-teacher" onchange="handleFilterChange()" class="w-full bg-white text-slate-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none border border-slate-200 focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none">
-                                        ${teachers.map(t => `<option value="${t}" ${selectedTeacher === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                    </select>
-                                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-                                        <i data-lucide="award" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
+                innerHTML = `
+                ${filterBarHTML}
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Purata Peratus Kelas</p>
+                        <h3 class="text-2xl font-black text-slate-800">${classAvgPercentage}%</h3>
                     </div>
-
-                    <!-- CONTROL BUTTONS ABOVE TABLE -->
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xs font-bold text-slate-500 uppercase">Status Penguncian Data:</span>
-                            <button onclick="toggleEditMode()" class="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm ${isEditMode ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300' : 'bg-slate-800 text-white hover:bg-slate-900'}">
-                                <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
-                                ${isEditMode ? 'Buka Kunci (Edit Mode)' : 'Kunci Grid (Paparan Sahaja)'}
-                            </button>
-                        </div>
-                        <!-- Satu Butang Save dan Satu Butang Hantar -->
-                        <div class="flex items-center gap-2">
-                            <button onclick="saveMarks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                <i data-lucide="save" class="w-4 h-4"></i> Simpan Rekod
-                            </button>
-                            <button onclick="hantarKeGuruKelas()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md">
-                                <i data-lucide="send" class="w-4 h-4"></i> Hantar
-                            </button>
-                        </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kadar Kelulusan (%)</p>
+                        <h3 class="text-2xl font-black text-emerald-600">${passPercentage}%</h3>
                     </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Murid Cemerlang (Gred A)</p>
+                        <h3 class="text-2xl font-black text-indigo-600">${cemerlangCount} Orang</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gagal Minimum (<40%)</p>
+                        <h3 class="text-2xl font-black text-rose-600">${failCount} Orang</h3>
+                    </div>
+                </div>
 
-                    <!-- TABLE AREA -->
-                    <div class="bg-white rounded-3xl shadow-sm border border-emerald-50 overflow-hidden">
-                        <div class="p-6 border-b border-emerald-50 bg-emerald-50/10 flex flex-wrap justify-between items-center gap-4">
-                            <div class="space-y-1">
-                                <h4 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                                    <i data-lucide="edit-3" class="text-emerald-600 w-5 h-5"></i> Paparan Pengisian Markah Pentaksiran
-                                </h4>
-                                <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">
-                                    Sesi Akademik: ${selectedYear} | Kelas: ${selectedClass} | Ujian: ${selectedAssessment} | Guru: ${selectedTeacher}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left min-w-[850px]">
-                                <thead>
-                                    <tr class="bg-emerald-50/30 text-emerald-800 text-xs uppercase font-extrabold border-b border-emerald-100">
-                                        <th class="p-4 w-1/3">Nama Murid</th>
-                                        <th class="p-4">No. Kad Pengenalan</th>
-                                        <th class="p-4 text-center">Markah (%)</th>
-                                        <th class="p-4 text-center">Gred</th>
-                                        <th class="p-4 text-center">PBD Semasa</th>
-                                        <th class="p-4 text-center bg-emerald-50/10">Markah Keseluruhan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rowsHTML}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="p-6 bg-slate-50 border-t border-gray-100 flex justify-between items-center">
-                            <p class="text-xs text-slate-500 font-semibold">SK Bukit Tongkat (Kementerian Pendidikan Malaysia)</p>
-                        </div>
+                <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h4 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Senarai Pencapaian Murid Kelas [${analysisSelectedClass}]</h4>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left min-w-[700px]">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold border-b border-slate-100">
+                                    <th class="p-4 w-16">No. KP</th>
+                                    <th class="p-4">Nama Penuh Murid</th>
+                                    <th class="p-4">No. Kad Pengenalan</th>
+                                    <th class="p-4 text-center">Jumlah Markah</th>
+                                    <th class="p-4 text-center">Peratus Am</th>
+                                    <th class="p-4 text-center">Gred Am</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${performanceListHTML}
+                            </tbody>
+                        </table>
                     </div>
                 </div>`;
             }
 
-            // 3. GURU KELAS DASHBOARD & MONITORING
-            else if (currentPage === 'guru_kelas_dashboard') {
-                container.innerHTML = renderComprehensiveMonitoringTable(false);
-            }
+            // C. MOD ANALISIS GABUNGAN KELAS
+            else {
+                let gabunganHTML = classes.map((cls, index) => {
+                    const clsStudents = students.filter(s => s.kelas === cls);
+                    const clsYear = parseInt(cls.charAt(0)) || 1;
+                    const clsActiveSubjects = getActiveSubjects(clsYear);
 
-            // 4. DATA MURID (ADMIN ONLY)
-            else if (currentPage === 'data_murid') {
-                let rows = students.map(s => `
-                    <tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
-                        <td class="p-4 text-sm font-bold text-slate-800">#${s.id}</td>
-                        <td class="p-4 text-sm font-semibold text-gray-700 uppercase">${s.nama}</td>
-                        <td class="p-4 text-sm font-semibold text-slate-500 font-mono">${s.ic}</td>
-                        <td class="p-4 text-sm font-semibold text-slate-500">${s.kelas}</td>
-                        <td class="p-4 text-right">
-                            <button onclick="deleteStudent(${s.id})" class="text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-all border border-transparent hover:border-rose-100" title="Padam Murid (Pindah)">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
+                    let sumScores = 0;
+                    let scoreCount = 0;
+                    let passed = 0;
+
+                    clsStudents.forEach(st => {
+                        let stSum = 0;
+                        let stCount = 0;
+                        clsActiveSubjects.forEach(sub => {
+                            const key = `${st.id}_${selectedYear}_${analysisSelectedAssessment}_${sub}`;
+                            const score = studentMarks[key];
+                            if (score !== undefined) {
+                                stSum += score;
+                                stCount++;
+                            }
+                        });
+                        if (stCount > 0) {
+                            const avg = Math.round(stSum / stCount);
+                            sumScores += avg;
+                            scoreCount++;
+                            if (avg >= 40) passed++;
+                        }
+                    });
+
+                    const avgPercent = scoreCount > 0 ? Math.round(sumScores / scoreCount) : 0;
+                    const passPercent = scoreCount > 0 ? Math.round((passed / scoreCount) * 100) : 0;
+                    const gradeInfo = calculateUASAGrade(avgPercent);
+
+                    return `
+                    <tr class="hover:bg-slate-50/50 border-b border-slate-100 transition-colors">
+                        <td class="p-4 text-xs font-bold text-slate-700">${index + 1}</td>
+                        <td class="p-4 text-xs font-bold text-slate-800 uppercase">${cls}</td>
+                        <td class="p-4 text-xs font-bold text-slate-600">${clsStudents.length} Orang</td>
+                        <td class="p-4 text-center font-mono text-xs font-black text-slate-800">${avgPercent}%</td>
+                        <td class="p-4 text-center">
+                            <span class="px-2 py-0.5 text-[9px] font-black rounded border ${gradeInfo.color}">${gradeInfo.grade}</span>
                         </td>
-                    </tr>
-                `).join('');
+                        <td class="p-4 text-center font-mono text-xs font-black text-emerald-600 bg-emerald-50/20">${passPercent}%</td>
+                    </tr>`;
+                }).join('');
 
-                container.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    <!-- ADMIN: DUA PILIHAN MUAT NAIK / DAFTAR (PILIHAN MANUAL & BULK UPLOAD) -->
-                    <div class="space-y-6 lg:col-span-1">
-                        
-                        <!-- 1. Muat Naik Fail CSV (Bulk Upload) -->
-                        <div class="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-4">
-                            <h4 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                                <i data-lucide="upload-cloud" class="text-emerald-600 w-5 h-5"></i> Muat Naik Murid (CSV)
-                            </h4>
-                            <p class="text-xs text-gray-500 leading-relaxed">
-                                Muat naik senarai murid secara pukal terus dari fail Excel/CSV anda. Pastikan aturan turutan lajur adalah seperti berikut:
-                            </p>
-                            <div class="bg-slate-50 p-2.5 rounded-xl text-[10px] font-mono text-slate-600 space-y-1">
-                                <p class="font-bold text-emerald-800">Format Lajur:</p>
-                                <p>Nama Murid, No. KP/IC, Kelas</p>
-                                <p class="text-slate-400 mt-1">Contoh: AMIRUL BIN ROSLAN,140220-01-0201,6 AR-RAZI</p>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <label class="block w-full border-2 border-dashed border-emerald-200 hover:border-emerald-500 bg-emerald-50/10 hover:bg-emerald-50/30 p-4 rounded-xl text-center cursor-pointer transition-all">
-                                    <i data-lucide="file-spreadsheets" class="w-8 h-8 text-emerald-600 mx-auto mb-2"></i>
-                                    <span class="text-xs font-bold text-emerald-800 block">Pilih Fail .csv</span>
-                                    <span class="text-[10px] text-gray-400">Pastikan format UTF-8</span>
-                                    <input type="file" accept=".csv" onchange="handleCSVImport(event)" class="hidden">
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- 2. Borang Manual Pendaftaran Murid -->
-                        <div class="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-4">
-                            <h4 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                                <i data-lucide="user-plus" class="text-emerald-600 w-5 h-5"></i> Pendaftaran Manual
-                            </h4>
-                            <form onsubmit="handleManualRegister(event)" class="space-y-4">
-                                <div class="space-y-1.5">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nama Penuh Murid</label>
-                                    <input id="admin-reg-nama" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-semibold uppercase" placeholder="Contoh: FARHAN BIN NAZRI">
-                                </div>
-                                <div class="space-y-1.5">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No. Kad Pengenalan / IC</label>
-                                    <input id="admin-reg-ic" type="text" required class="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-semibold" placeholder="Contoh: 140301-01-0101">
-                                </div>
-                                <div class="space-y-1.5">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kelas Pilihan</label>
-                                    <select id="admin-reg-kelas" class="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold bg-white text-gray-700">
-                                        ${classes.map(c => `<option value="${c}">${c}</option>`).join('')}
-                                    </select>
-                                </div>
-                                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-xs">
-                                    <i data-lucide="plus" class="w-4 h-4"></i> Daftarkan Murid
-                                </button>
-                            </form>
-                        </div>
-
+                innerHTML = `
+                ${filterBarHTML}
+                <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h4 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Matriks Gabungan Kelulusan Sekolah</h4>
                     </div>
-
-                    <!-- Students List Table -->
-                    <div class="lg:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h4 class="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <i data-lucide="users" class="text-slate-600 w-5 h-5"></i> Senarai Murid Berdaftar SMM
-                            </h4>
-                            <span class="text-xs font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-full uppercase">
-                                Jumlah: ${students.length} Murid
-                            </span>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left min-w-[500px]">
-                                <thead>
-                                    <tr class="bg-gray-50 text-slate-500 text-xs uppercase font-bold border-b border-gray-100">
-                                        <th class="p-4 w-16">ID</th>
-                                        <th class="p-4">Nama Penuh</th>
-                                        <th class="p-4">No. Kad Pengenalan</th>
-                                        <th class="p-4">Kelas</th>
-                                        <th class="p-4 text-right">Tindakan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rows}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left min-w-[700px]">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold border-b border-slate-100">
+                                    <th class="p-4 w-16">No.</th>
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Bil. Murid</th>
+                                    <th class="p-4 text-center">Purata Kelas (%)</th>
+                                    <th class="p-4 text-center">Gred Purata (GPS)</th>
+                                    <th class="p-4 text-center">Kadar Kelulusan (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${gabunganHTML}
+                            </tbody>
+                        </table>
                     </div>
                 </div>`;
             }
 
-            // 5. LAPORAN UASA & PEMANTAUAN PUKAL (ADMIN MONITORING VIEW)
-            else if (currentPage === 'laporan_uasa') {
-                container.innerHTML = renderComprehensiveMonitoringTable(true);
-            }
-
-            // 6. TETAPAN (SETTINGS)
-            else if (currentPage === 'settings') {
-                container.innerHTML = `
-                <div class="max-w-3xl space-y-8">
-                    <div class="bg-white p-8 rounded-2xl border border-emerald-100 shadow-sm space-y-6">
-                        <h4 class="font-bold text-gray-800 text-xl flex items-center gap-2 border-b border-gray-100 pb-4">
-                            <i data-lucide="sliders" class="text-emerald-600 w-6 h-6"></i> Tetapan Profil
-                        </h4>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="space-y-2">
-                                <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">Nama Pengguna</label>
-                                <input type="text" readonly disabled value="${currentUser.fullName}" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-400 outline-none text-sm font-semibold cursor-not-allowed">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="text-sm font-semibold text-gray-700 flex items-center gap-2">Sistem Emel</label>
-                                <input type="text" readonly disabled value="${currentUser.email}" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-400 outline-none text-sm font-semibold cursor-not-allowed">
-                            </div>
-                        </div>
+            container.innerHTML = `
+            <div class="space-y-6">
+                <!-- Header Info -->
+                <div class="bg-slate-900 p-8 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-8 text-white opacity-5">
+                        <i data-lucide="bar-chart-3" style="width: 150px; height: 150px;"></i>
                     </div>
-                </div>`;
-            }
+                    <div class="relative z-10 space-y-2">
+                        <span class="bg-indigo-500 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">KONSOL ANALISIS AKADEMIK</span>
+                        <h1 class="text-3xl font-black mb-1 tracking-tight">Analisis Keputusan Sekolah</h1>
+                        <p class="opacity-80 max-w-2xl text-sm leading-relaxed">
+                            Analisis menyeluruh bagi memantau prestasi individu, kelas, serta gabungan GPS keseluruhan sekolah merentasi ketiga-tiga saringan ujian utama.
+                        </p>
+                    </div>
+                </div>
+
+                ${innerHTML}
+            </div>`;
             
             lucide.createIcons();
         }
