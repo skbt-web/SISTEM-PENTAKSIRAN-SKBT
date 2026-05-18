@@ -182,7 +182,6 @@
             'BAHASA MELAYU', 'BAHASA INGGERIS', 'SAINS', 'MATEMATIK', 'PENDIDIKAN ISLAM',
             'BAHASA ARAB', 'MUZIK', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'PENDIDIKAN SENI DAN VISUAL'
         ];
-        const subjects = baseSubjects; // compatibility fallback
 
         const teachers = [
             'MAZUIN BINTI AHMAD KAMIL', 'MOHD KAMAL BIN MOHD SHAH', 'NOR AZAH BINTI MORI',
@@ -206,7 +205,8 @@
             '14_2026_PENTAKSIRAN SUMATIF 1_MUZIK': 85,
             '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN JASMANI DAN KESIHATAN': 90,
             '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN SENI DAN VISUAL': 82,
-            '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 88, // dummy for Tahun 6
+            '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 88, 
+            '14_2026_PENTAKSIRAN SUMATIF 1_SEJARAH': 84, // dummy for Tahun 6 Sejarah
 
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 55,
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 40,
@@ -225,6 +225,7 @@
             '14_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP4',
             '14_2026_PENTAKSIRAN SUMATIF 1_PENDIDIKAN ISLAM': 'TP4',
             '14_2026_PENTAKSIRAN SUMATIF 1_REKA BENTUK TEKNOLOGI': 'TP5',
+            '14_2026_PENTAKSIRAN SUMATIF 1_SEJARAH': 'TP5',
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA MELAYU': 'TP3',
             '15_2026_PENTAKSIRAN SUMATIF 1_BAHASA INGGERIS': 'TP2'
         };
@@ -462,11 +463,11 @@
             selectedYear = document.getElementById('sel-year').value;
             const newClass = document.getElementById('sel-class').value;
             
-            // Check if RBT should be reset in subject selection
+            // Check if RBT / SEJARAH should be reset in subject selection
             const newClassYear = parseInt(newClass.charAt(0)) || 1;
             selectedClass = newClass;
             
-            if (newClassYear < 4 && selectedSubject === 'REKA BENTUK TEKNOLOGI') {
+            if (newClassYear < 4 && (selectedSubject === 'REKA BENTUK TEKNOLOGI' || selectedSubject === 'SEJARAH')) {
                 selectedSubject = 'BAHASA MELAYU';
             }
             
@@ -650,12 +651,32 @@
             }
         }
 
+        // --- GET ACTIVE SUBJECTS DYNAMICALLY ---
+        function getActiveSubjects(classYear) {
+            // Tahun 4, 5, 6 mempunyai tambahan RBT dan SEJARAH (11 subjek)
+            // Tahun 1, 2, 3 hanya 9 subjek asas
+            if (classYear >= 4) {
+                // Letak SEJARAH bersebelahan dengan BAHASA ARAB (indeks 6)
+                // baseSubjects asal: BM, BI, SN, MT, PI, BA, MZ, PJK, PSV
+                const active = [...baseSubjects];
+                const arabIndex = active.indexOf('BAHASA ARAB');
+                if (arabIndex !== -1) {
+                    active.splice(arabIndex + 1, 0, 'SEJARAH');
+                } else {
+                    active.push('SEJARAH');
+                }
+                active.push('REKA BENTUK TEKNOLOGI');
+                return active;
+            } else {
+                return baseSubjects;
+            }
+        }
+
         // --- CALCULATE CLASS RANKINGS IN-MEMORY ---
         function getClassRankings(targetClass) {
             const classStudents = students.filter(s => s.kelas === targetClass);
             const classYear = parseInt(targetClass.charAt(0)) || 1;
-            const isRBTVisible = classYear >= 4;
-            const activeSubjects = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
+            const activeSubjects = getActiveSubjects(classYear);
 
             const performances = classStudents.map(s => {
                 let totalMarks = 0;
@@ -691,10 +712,7 @@
             const classStudents = students.filter(s => s.kelas === selectedClass);
             const classRankings = getClassRankings(selectedClass);
             const classYear = parseInt(selectedClass.charAt(0)) || 1;
-            const isRBTVisible = classYear >= 4;
-            
-            // Susun RBT bersebelahan dengan Pendidikan Seni Visual
-            const activeSubjects = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
+            const activeSubjects = getActiveSubjects(classYear);
 
             // Monitoring Stats
             const totalRequiredEntries = classStudents.length * activeSubjects.length;
@@ -1012,8 +1030,7 @@
             else if (currentPage === 'pengisian_markah') {
                 const filteredStudents = students.filter(s => s.kelas === selectedClass);
                 const classYear = parseInt(selectedClass.charAt(0)) || 1;
-                const isRBTVisible = classYear >= 4;
-                const activeSubjectsForClass = isRBTVisible ? [...baseSubjects, 'REKA BENTUK TEKNOLOGI'] : baseSubjects;
+                const activeSubjectsForClass = getActiveSubjects(classYear);
 
                 let rowsHTML = filteredStudents.map(s => {
                     const key = `${s.id}_${selectedYear}_${selectedAssessment}_${selectedSubject}`;
