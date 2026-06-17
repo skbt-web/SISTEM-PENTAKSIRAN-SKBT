@@ -1893,70 +1893,63 @@
         };
     </script>
     <script>
-    (function() {
-            'use strict';
+   (function() {
+    'use strict';
 
-            // 1. PENGURUSAN KLIK KANAN
-            document.addEventListener('contextmenu', function(e) {
-                // Jika klik kanan berlaku di dalam kawasan 'dalam-sistem', benarkan
-                if (e.target.closest('.dalam-sistem')) {
-                    return true; 
-                } else {
-                    // Jika di luar, sekat secara senyap (tiada alert)
-                    e.preventDefault();
-                }
-            });
+    // 1. PENGURUSAN KLIK KANAN (CONTEXT MENU)
+    document.addEventListener('contextmenu', function(e) {
+        // Hanya benarkan klik kanan jika berada di dalam elemen '.dalam-sistem'
+        if (e.target.closest('.dalam-sistem')) {
+            return true; 
+        } else {
+            e.preventDefault(); // Lock bahagian lain secara senyap
+        }
+    });
 
-            // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
-            document.addEventListener('keydown', function(e) {
-                const isDalamSistem = e.target.closest('.dalam-sistem');
+    // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
+    document.addEventListener('keydown', function(e) {
+        const isDalamSistem = e.target.closest('.dalam-sistem');
 
-                // Sekat Ctrl+C / Ctrl+X secara senyap HANYA jika berada DI LUAR sistem
-                if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
-                    e.preventDefault();
-                    return false;
-                }
+        // LOCK fungsi salin (Ctrl+C / Ctrl+X) jika pengguna berada di LUAR sistem
+        if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
+            e.preventDefault();
+            return false;
+        }
 
-                // SEKATAN GLOBAL (Sentiasa sekat di mana-mana sudut halaman pun)
-                // Menghalang View Source (Ctrl+U)
-                if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
-                    e.preventDefault();
-                    return false;
-                }
+        // LOCK GLOBAL (Sentiasa sekat Inspect Element & View Source di mana-mana bahagian pun)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'u') { // Ctrl+U (View Source)
+            e.preventDefault();
+            return false;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') { // Ctrl+S (Save Page)
+            e.preventDefault();
+            return false;
+        }
+        if ( // F12 & Ctrl+Shift+I/J/C (Inspect Element)
+            e.key === 'F12' || 
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
+        ) {
+            e.preventDefault();
+            return false;
+        }
+    });
 
-                // Menghalang Save Page (Ctrl+S)
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                    e.preventDefault();
-                    return false;
-                }
+    // 3. ANTI-DEBUGGER (Lock Inspect Element daripada diceroboh melalui menu browser)
+    function antiDebug(i) {
+        if (("" + i / i).length !== 1 || i % 20 === 0) {
+            (function() {}).constructor("debugger")();
+        } else {
+            (function() {}).constructor("debugger")();
+        }
+        antiDebug(++i);
+    }
+    try {
+        setInterval(function() {
+            antiDebug(0);
+        }, 50);
+    } catch (e) {}
 
-                // Menghalang Inspect Element (F12, Ctrl+Shift+I/J/C)
-                if (
-                    e.key === 'F12' || 
-                    ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
-                ) {
-                    e.preventDefault();
-                    return false;
-                }
-            });
-
-            // 3. ANTI-DEBUGGER (Sentiasa aktif mengekang Inspect Element)
-            function antiDebug(i) {
-                if (("" + i / i).length !== 1 || i % 20 === 0) {
-                    (function() {}).constructor("debugger")();
-                } else {
-                    (function() {}).constructor("debugger")();
-                }
-                antiDebug(++i);
-            }
-
-            try {
-                setInterval(function() {
-                    antiDebug(0);
-                }, 50);
-            } catch (e) {}
-
-        })();
+})();
     </script>    
 </body>
 </html>
