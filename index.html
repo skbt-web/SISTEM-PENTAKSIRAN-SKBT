@@ -1982,6 +1982,58 @@
         lucide.createIcons();
     </script>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDpmxg5Ez42-xanvMkqlLA6hJ3TVQzZ6iM",
+            authDomain: markah-pentaksiran-pbd-skbt.firebaseapp.com",
+            projectId: "markah-pentaksiran-pbd-skbt",
+            storageBucket: "markah-pentaksiran-pbd-skbt.firebasestorage.app",
+            messagingSenderId:"637554798160",
+            appId: "1:637554798160:web:e1ed6430375ca98cbc6b55",
+            measurementId: "G-DLBX78XMFV"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const form = document.getElementById('muridForm');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const dataMurid = {
+                nama: document.getElementById('nama').value,
+                no_ic: document.getElementById('ic').value,
+                markah_subjek: {
+                    bahasa_melayu: Number(document.getElementById('bm').value),
+                    bahasa_inggeris: Number(document.getElementById('bi').value),
+                    matematik: Number(document.getElementById('matematik').value),
+                    sains: Number(document.getElementById('sains').value),
+                    pendidikan_islam: Number(document.getElementById('islam').value),
+                    bahasa_arab: Number(document.getElementById('arab').value),
+                    muzik: Number(document.getElementById('muzik').value),
+                    pjk: Number(document.getElementById('pjk').value),
+                    psv: Number(document.getElementById('psv').value),
+                    sejarah: Number(document.getElementById('sejarah').value),
+                    rekabentuk_teknologi: Number(document.getElementById('rbt').value)
+                },
+                pbd_semasa: document.getElementById('pbd').value,
+                tarikh_kemasukan: new Date().toLocaleString()
+            };
+
+            try {
+                const docRef = await addDoc(collection(db, "markah_murid"), dataMurid);
+                alert("Data murid berjaya disimpan!");
+                form.reset();
+            } catch (error) {
+                console.error("Ralat: ", error);
+                alert("Gagal menyimpan data.");
+            }
+        });
+    </script>
+
     <script>
         (function() {
     'use strict';
