@@ -408,7 +408,7 @@
         ];
         const assessments = ['PENTAKSIRAN SUMATIF 1', 'PENTAKSIRAN SUMATIF 2', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
         
-        // 9 Matapelajaran mengikut etert.jpg
+        // 9 Mata pelajaran mengikut etert.jpg
         const baseSubjects = [
             'BAHASA ARAB', 'BAHASA INGGERIS', 'BAHASA MELAYU', 'MATEMATIK', 'SAINS', 
             'PENDIDIKAN ISLAM', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK', 'PENDIDIKAN SENI VISUAL', 'SEJARAH', 'REKA BENTUK TEKNOLOGI'
@@ -1792,7 +1792,7 @@ currentUser.fullName = namaGuru;
                                 <div class="theme-soft-orange p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Subjek Teras Dipantau</p>
-                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Matapelajaran</h4>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Mata pelajaran</h4>
                                 </div>
                             </div>
                         </div>
@@ -1956,7 +1956,7 @@ currentUser.fullName = namaGuru;
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-[10px] font-bold text-gray-400 uppercase">Matapelajaran</label>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Mata pelajaran</label>
                                 <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${subjectsToUse.map(s => `<option value="${s}" ${selectedSubject===s?'selected':''}>${s}</option>`).join('')}
                                 </select>
@@ -2664,7 +2664,7 @@ currentUser.fullName = namaGuru;
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th class="p-3">Matapelajaran</th>
+                                        <th class="p-3">Mata pelajaran</th>
                                         <th class="p-3 text-center">Markah</th>
                                         <th class="p-3 text-center">Gred</th>
                                         <th class="p-3 text-center">PBD TP</th>
