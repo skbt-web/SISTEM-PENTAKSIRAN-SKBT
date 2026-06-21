@@ -408,7 +408,7 @@
         ];
         const assessments = ['PENTAKSIRAN SUMATIF 1', 'PENTAKSIRAN SUMATIF 2', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
         
-        // 9 Mata pelajaran mengikut etert.jpg
+        // 9 Matapelajaran mengikut etert.jpg
         const baseSubjects = [
             'BAHASA ARAB', 'BAHASA INGGERIS', 'BAHASA MELAYU', 'MATEMATIK', 'SAINS', 
             'PENDIDIKAN ISLAM', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK', 'PENDIDIKAN SENI VISUAL', 'SEJARAH', 'REKA BENTUK TEKNOLOGI'
@@ -1176,6 +1176,7 @@ currentUser.fullName = namaGuru;
             }
 
             await persistMarksBulkToSupabase(markRows, pbdRows);
+            await fetchAllDataFromSupabase();
 
             if (!silent) {
                 showToast(`Selesai menyimpan ${successCount} rekod prestasi ke Supabase.`, 'success');
@@ -1754,6 +1755,295 @@ currentUser.fullName = namaGuru;
             `;
         }
 
+
+        // --- DASHBOARD GURU: SEMAKAN PENGISIAN SENDIRI ---
+        function normalizeName(value) {
+            return String(value || '').trim().toUpperCase();
+        }
+
+        function getTeacherOwnStatusRows() {
+            const guruName = normalizeName(currentUser?.name);
+            const guruEmail = String(currentUser?.email || '').trim().toLowerCase();
+            const grouped = {};
+
+            function shouldInclude(row) {
+                if (!row) return false;
+                const rowEmail = String(row.teacher_email || '').trim().toLowerCase();
+                const rowTeacher = normalizeName(row.teacher_name);
+                if (guruEmail && rowEmail === guruEmail) return true;
+                if (guruName && rowTeacher === guruName) return true;
+                return false;
+            }
+
+            function ensureGroup(row) {
+                const tahunName = row.tahun || selectedYear;
+                const assessmentName = row.assessment || selectedAssessment;
+                const kelasName = row.kelas || '-';
+                const subjectName = row.subject || '-';
+                const teacherName = row.teacher_name || currentUser?.name || '-';
+                const key = [tahunName, assessmentName, kelasName, subjectName].join('||');
+
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        tahun: tahunName,
+                        assessment: assessmentName,
+                        kelas: kelasName,
+                        subject: subjectName,
+                        teacher_name: teacherName,
+                        teacher_email: row.teacher_email || currentUser?.email || '-',
+                        markIds: new Set(),
+                        pbdIds: new Set(),
+                        updated_at: row.updated_at || null
+                    };
+                }
+
+                if (row.updated_at && (!grouped[key].updated_at || new Date(row.updated_at) > new Date(grouped[key].updated_at))) {
+                    grouped[key].updated_at = row.updated_at;
+                }
+
+                return grouped[key];
+            }
+
+            (markStatusRows || []).filter(shouldInclude).forEach(row => {
+                const g = ensureGroup(row);
+                if (row.student_id && row.value !== null && row.value !== undefined && row.value !== '') {
+                    g.markIds.add(String(row.student_id));
+                }
+            });
+
+            (pbdStatusRows || []).filter(shouldInclude).forEach(row => {
+                const g = ensureGroup(row);
+                if (row.student_id && row.value !== null && row.value !== undefined && row.value !== '') {
+                    g.pbdIds.add(String(row.student_id));
+                }
+            });
+
+            return Object.values(grouped).map(item => {
+                const total = getClassStudentCount(item.kelas);
+                const markCompleted = item.markIds.size;
+                const pbdCompleted = item.pbdIds.size;
+                const completeBoth = Math.min(markCompleted, pbdCompleted);
+                const percent = total > 0 ? Math.round((completeBoth / total) * 100) : 0;
+                let status = 'BELUM MULA';
+                if (completeBoth > 0 && completeBoth < total) status = 'SEBAHAGIAN';
+                if (total > 0 && markCompleted >= total && pbdCompleted >= total) status = 'SIAP';
+                return { ...item, total, markCompleted, pbdCompleted, completeBoth, percent, status };
+            }).sort((a, b) => {
+                return (a.kelas + a.subject + a.assessment).localeCompare(b.kelas + b.subject + b.assessment);
+            });
+        }
+
+        function editTeacherFilling(tahun, assessment, kelas, subject, teacherName) {
+            selectedYear = tahun;
+            selectedAssessment = assessment;
+            selectedClass = kelas;
+            selectedSubject = subject;
+            selectedTeacher = teacherName || currentUser?.name || selectedTeacher;
+            isEditMode = true;
+            navigate('pengisian_markah');
+        }
+
+        function exportTeacherStatusCSV() {
+            const rows = getTeacherOwnStatusRows();
+            const csvRows = [
+                ['Nama Guru','Tahun','Pentaksiran','Kelas','Mata Pelajaran','Markah Diisi','PBD Diisi','Jumlah Murid','Peratus','Status','Kemaskini Terakhir']
+            ];
+            rows.forEach(r => {
+                csvRows.push([
+                    currentUser?.name || '', r.tahun, r.assessment, r.kelas, r.subject,
+                    r.markCompleted, r.pbdCompleted, r.total, r.percent + '%', r.status, formatDateTimeMY(r.updated_at)
+                ]);
+            });
+            const csv = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Status_Pengisian_${(currentUser?.name || 'Guru').replace(/\s+/g,'_')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportTeacherStatusExcel() {
+            try {
+                const rows = getTeacherOwnStatusRows();
+                const wsData = [
+                    ['Nama Guru','Tahun','Pentaksiran','Kelas','Mata Pelajaran','Markah Diisi','PBD Diisi','Jumlah Murid','Peratus','Status','Kemaskini Terakhir']
+                ];
+                rows.forEach(r => {
+                    wsData.push([
+                        currentUser?.name || '', r.tahun, r.assessment, r.kelas, r.subject,
+                        r.markCompleted, r.pbdCompleted, r.total, r.percent + '%', r.status, formatDateTimeMY(r.updated_at)
+                    ]);
+                });
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+                XLSX.utils.book_append_sheet(wb, ws, 'Status Guru');
+                XLSX.writeFile(wb, `Status_Pengisian_${(currentUser?.name || 'Guru').replace(/\s+/g,'_')}.xlsx`);
+                showToast('Status pengisian guru berjaya dieksport ke Excel.', 'success');
+            } catch (e) {
+                console.error('Gagal eksport Excel status guru:', e);
+                showToast('Ralat eksport Excel status guru.', 'danger');
+            }
+        }
+
+        function printTeacherStatusA4() {
+            const rows = getTeacherOwnStatusRows();
+            const tableRows = rows.length === 0 ? `
+                <tr><td colspan="10" style="text-align:center;padding:12px;">Belum ada rekod pengisian.</td></tr>
+            ` : rows.map((r, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${r.tahun}</td>
+                    <td>${r.assessment}</td>
+                    <td>${r.kelas}</td>
+                    <td>${r.subject}</td>
+                    <td>${r.markCompleted}/${r.total}</td>
+                    <td>${r.pbdCompleted}/${r.total}</td>
+                    <td>${r.percent}%</td>
+                    <td>${r.status}</td>
+                    <td>${formatDateTimeMY(r.updated_at)}</td>
+                </tr>
+            `).join('');
+
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <!DOCTYPE html>
+                <html lang="ms">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Status Pengisian Guru</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 14mm; }
+                        body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11px; }
+                        h1, h2, p { margin: 0; text-align: center; }
+                        h1 { font-size: 15px; font-weight: 700; }
+                        h2 { font-size: 13px; margin-top: 4px; }
+                        .meta { margin: 14px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; font-size: 11px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                        th, td { border: 1px solid #000; padding: 5px; text-align: center; }
+                        th { font-weight: 700; }
+                        td:nth-child(5), th:nth-child(5) { text-align: left; }
+                        .footer { margin-top: 18px; font-size: 10px; text-align: right; }
+                        .no-print { margin: 12px 0; text-align: right; }
+                        button { padding: 8px 12px; font-weight: bold; }
+                        @media print { .no-print { display: none; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print"><button onclick="window.print()">Cetak / Simpan PDF</button></div>
+                    <h1>SEKOLAH KEBANGSAAN BUKIT TONGKAT</h1>
+                    <p>JALAN MAWAR FELDA ULU BELITONG, 86000 KLUANG, JOHOR</p>
+                    <h2>STATUS PENGISIAN MARKAH DAN PBD GURU</h2>
+                    <div class="meta">
+                        <div><strong>Nama Guru:</strong> ${currentUser?.name || '-'}</div>
+                        <div><strong>Emel:</strong> ${currentUser?.email || '-'}</div>
+                        <div><strong>Tarikh Cetak:</strong> ${new Date().toLocaleDateString('ms-MY')}</div>
+                        <div><strong>Jumlah Rekod:</strong> ${rows.length}</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bil</th><th>Tahun</th><th>Pentaksiran</th><th>Kelas</th><th>Mata Pelajaran</th>
+                                <th>Markah</th><th>PBD</th><th>%</th><th>Status</th><th>Kemaskini</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                    <div class="footer">Dicetak melalui Sistem SISMAR SK Bukit Tongkat</div>
+                </body>
+                </html>
+            `);
+            win.document.close();
+            win.focus();
+        }
+
+        function renderTeacherOwnStatusPanel() {
+            const rows = getTeacherOwnStatusRows();
+            const siap = rows.filter(r => r.status === 'SIAP').length;
+            const sebahagian = rows.filter(r => r.status === 'SEBAHAGIAN').length;
+            const belum = rows.filter(r => r.status === 'BELUM MULA').length;
+            const jumlahMurid = rows.reduce((sum, r) => sum + r.completeBoth, 0);
+
+            return `
+                <div class="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-indigo-50 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-base flex items-center gap-2">
+                                <i data-lucide="user-check" class="w-5 h-5 text-indigo-600"></i>
+                                Status Pengisian Saya
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">
+                                Paparan ini hanya menunjukkan rekod milik ${currentUser?.name || 'guru ini'} berdasarkan emel login dan nama guru.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 no-print">
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Status guru telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                            </button>
+                            <button onclick="exportTeacherStatusCSV()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> CSV
+                            </button>
+                            <button onclick="exportTeacherStatusExcel()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
+                            </button>
+                            <button onclick="printTeacherStatusA4()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print A4
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 bg-indigo-50/30 border-b border-slate-100">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Rekod Subjek</p><h4 class="text-xl font-black text-slate-800">${rows.length}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Siap</p><h4 class="text-xl font-black text-blue-700">${siap}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Sebahagian</p><h4 class="text-xl font-black text-amber-700">${sebahagian}</h4></div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase">Murid Lengkap</p><h4 class="text-xl font-black text-purple-700">${jumlahMurid}</h4></div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4">Guru</th>
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Subjek</th>
+                                    <th class="p-4">Pentaksiran</th>
+                                    <th class="p-4 text-center">Markah</th>
+                                    <th class="p-4 text-center">PBD</th>
+                                    <th class="p-4 text-center">%</th>
+                                    <th class="p-4">Kemaskini</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${rows.length === 0 ? `
+                                    <tr><td colspan="10" class="p-6 text-center text-slate-400 font-bold">Belum ada rekod pengisian untuk guru ini.</td></tr>
+                                ` : rows.map(r => `
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="p-4 font-bold text-slate-800">${currentUser?.name || r.teacher_name}</td>
+                                        <td class="p-4"><span class="bg-indigo-50 text-indigo-700 text-[10px] px-2.5 py-1 rounded-full font-black">${r.kelas}</span></td>
+                                        <td class="p-4 font-semibold text-slate-600">${r.subject}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${r.assessment}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.markCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.pbdCompleted}/${r.total}</td>
+                                        <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
+                                        <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <button onclick="editTeacherFilling('${r.tahun}','${r.assessment.replace(/'/g, "\\'")}','${r.kelas.replace(/'/g, "\\'")}','${r.subject.replace(/'/g, "\\'")}','${String(r.teacher_name || '').replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold">
+                                                Edit / Lihat Murid
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -1792,7 +2082,7 @@ currentUser.fullName = namaGuru;
                                 <div class="theme-soft-orange p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Subjek Teras Dipantau</p>
-                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Mata pelajaran</h4>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Matapelajaran</h4>
                                 </div>
                             </div>
                         </div>
@@ -1829,6 +2119,7 @@ currentUser.fullName = namaGuru;
                         </div>
 
                         ${isAdmin ? renderFillingStatusPanel('admin') : ''}
+                        ${(!isAdmin && currentUser?.role === 'Guru') ? renderTeacherOwnStatusPanel() : ''}
                     </div>
                 `;
             }
@@ -1956,7 +2247,7 @@ currentUser.fullName = namaGuru;
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-[10px] font-bold text-gray-400 uppercase">Mata pelajaran</label>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Matapelajaran</label>
                                 <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${subjectsToUse.map(s => `<option value="${s}" ${selectedSubject===s?'selected':''}>${s}</option>`).join('')}
                                 </select>
@@ -2664,7 +2955,7 @@ currentUser.fullName = namaGuru;
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th class="p-3">Mata pelajaran</th>
+                                        <th class="p-3">Matapelajaran</th>
                                         <th class="p-3 text-center">Markah</th>
                                         <th class="p-3 text-center">Gred</th>
                                         <th class="p-3 text-center">PBD TP</th>
@@ -2725,52 +3016,6 @@ currentUser.fullName = namaGuru;
             renderPage();
         };
     </script>
-    <script>
-   (function() {
-    'use strict';
-
-    // 1. PENGURUSAN KLIK KANAN (CONTEXT MENU)
-    document.addEventListener('contextmenu', function(e) {
-        // Hanya benarkan klik kanan jika berada di dalam elemen '.dalam-sistem'
-        if (e.target.closest('.dalam-sistem')) {
-            return true; 
-        } else {
-            e.preventDefault(); // Lock bahagian lain secara senyap
-        }
-    });
-
-    // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
-    document.addEventListener('keydown', function(e) {
-        const isDalamSistem = e.target.closest('.dalam-sistem');
-
-        // LOCK fungsi salin (Ctrl+C / Ctrl+X) jika pengguna berada di LUAR sistem
-        if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
-            e.preventDefault();
-            return false;
-        }
-
-        // LOCK GLOBAL (Sentiasa sekat Inspect Element & View Source di mana-mana bahagian pun)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'u') { // Ctrl+U (View Source)
-            e.preventDefault();
-            return false;
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') { // Ctrl+S (Save Page)
-            e.preventDefault();
-            return false;
-        }
-        if ( // F12 & Ctrl+Shift+I/J/C (Inspect Element)
-            e.key === 'F12' || 
-            ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
-        ) {
-            e.preventDefault();
-            return false;
-        }
-    });
-
-    // 3. ANTI-DEBUGGER dinyahaktifkan kerana loop rekursif menyebabkan fungsi login tersekat.
-
-})();
-    </script>    
 
 </body>
 </html>
