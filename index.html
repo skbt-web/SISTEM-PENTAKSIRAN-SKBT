@@ -1101,7 +1101,37 @@ if (type === 'guru_kelas') {
                 overlay.classList.add('hidden');
             }
         }
+        // LETAK KOD REFRESH DI SINI
+async function refreshGuruKelasDashboard() {
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
 
+        if (!user) return;
+
+        const emailGuru = user.email.toLowerCase().trim();
+
+        const { data } = await supabaseClient
+            .from('class_teachers')
+            .select('*')
+            .or(`guru_kelas_email.eq.${emailGuru},pembantu_email.eq.${emailGuru}`)
+            .maybeSingle();
+
+        if (data) {
+            guruKelasSelectedClass = data.kelas;
+
+            currentUser.kelas = data.kelas;
+            currentUser.guruKelas = data.guru_kelas;
+            currentUser.pembantuGuru = data.pembantu_guru;
+
+            renderPage();
+
+            showToast(`Kelas ${data.kelas} berjaya disegarkan.`, 'success');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal menyegarkan dashboard.', 'danger');
+    }
+}
         // --- TOAST SYSTEMS ---
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -2259,8 +2289,11 @@ if (type === 'guru_kelas') {
                             <select onchange="guruKelasSelectedClass=this.value; renderPage()" class="p-2 border border-purple-100 rounded-xl text-xs font-bold outline-none bg-white">
                                 ${getAllowedGuruKelasClasses().map(a => `<option value="${a.kelas}" ${guruKelasSelectedClass===a.kelas?'selected':''}>${a.kelas}</option>`).join('')}
                             </select>
-                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Data semakan telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                           <button onclick="refreshGuruKelasDashboard()"
+class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+    Refresh
+</button>
                             </button>
                         </div>
                     </div>
