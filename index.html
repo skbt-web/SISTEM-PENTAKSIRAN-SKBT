@@ -1102,37 +1102,43 @@ if (type === 'guru_kelas') {
             }
         }
         // LETAK KOD REFRESH DI SINI
-       async function refreshGuruKelasDashboard() {
+        function cleanEmail(value) {
+    return String(value || '')
+        .toLowerCase()
+        .trim()
+        .replace('mailto:', '')
+        .replace('[', '')
+        .replace(']', '')
+        .replace('(', '')
+        .replace(')', '');
+}
+
+async function refreshGuruKelasDashboard() {
     try {
         await fetchAllDataFromSupabase();
 
-        const emailGuru = currentUser?.email?.toLowerCase().trim();
-
-        if (!emailGuru) {
-            showToast('Emel guru tidak dikesan. Sila login semula.', 'warning');
-            return;
-        }
+        const { data: userData } = await supabaseClient.auth.getUser();
+        const emailGuru = cleanEmail(userData?.user?.email || currentUser?.email);
 
         const { data, error } = await supabaseClient
             .from('class_teachers')
             .select('*');
 
         if (error) {
-            console.error('Ralat Guru Kelas:', error);
-            showToast('Gagal semak data Guru Kelas.', 'danger');
+            console.error('Ralat class_teachers:', error);
+            showToast('Gagal baca data Guru Kelas.', 'danger');
             return;
         }
 
-        const kelasGuru = (data || []).find(row => {
-            const emailGK = String(row.guru_kelas_email || '').toLowerCase().trim();
-            const emailPembantu = String(row.pembantu_email || '').toLowerCase().trim();
+        console.log('Email login:', emailGuru);
+        console.log('Data class_teachers:', data);
 
-            return emailGK === emailGuru || emailPembantu === emailGuru;
+        const kelasGuru = (data || []).find(row => {
+            return cleanEmail(row.guru_kelas_email) === emailGuru ||
+                   cleanEmail(row.pembantu_email) === emailGuru;
         });
 
         if (!kelasGuru) {
-            console.log('Email login:', emailGuru);
-            console.log('Data class_teachers:', data);
             showToast('Emel ini belum didaftarkan sebagai Guru Kelas atau Pembantu Guru Kelas.', 'warning');
             return;
         }
@@ -1143,7 +1149,6 @@ if (type === 'guru_kelas') {
         currentUser.pembantuGuru = kelasGuru.pembantu_guru || kelasGuru.pembantu || '-';
 
         renderPage();
-
         showToast(`Dashboard ${kelasGuru.kelas} berjaya disegarkan.`, 'success');
 
     } catch (err) {
