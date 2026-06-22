@@ -1102,7 +1102,7 @@ if (type === 'guru_kelas') {
             }
         }
         // LETAK KOD REFRESH DI SINI
-        async function refreshGuruKelasDashboard() {
+       async function refreshGuruKelasDashboard() {
     try {
         await fetchAllDataFromSupabase();
 
@@ -1115,9 +1115,7 @@ if (type === 'guru_kelas') {
 
         const { data, error } = await supabaseClient
             .from('class_teachers')
-            .select('*')
-            .or(`guru_kelas_email.eq.${emailGuru},pembantu_email.eq.${emailGuru}`)
-            .maybeSingle();
+            .select('*');
 
         if (error) {
             console.error('Ralat Guru Kelas:', error);
@@ -1125,19 +1123,28 @@ if (type === 'guru_kelas') {
             return;
         }
 
-        if (!data) {
+        const kelasGuru = (data || []).find(row => {
+            const emailGK = String(row.guru_kelas_email || '').toLowerCase().trim();
+            const emailPembantu = String(row.pembantu_email || '').toLowerCase().trim();
+
+            return emailGK === emailGuru || emailPembantu === emailGuru;
+        });
+
+        if (!kelasGuru) {
+            console.log('Email login:', emailGuru);
+            console.log('Data class_teachers:', data);
             showToast('Emel ini belum didaftarkan sebagai Guru Kelas atau Pembantu Guru Kelas.', 'warning');
             return;
         }
 
-        guruKelasSelectedClass = data.kelas;
-        currentUser.kelas = data.kelas;
-        currentUser.guruKelas = data.guru_kelas || '-';
-        currentUser.pembantuGuru = data.pembantu_guru || '-';
+        guruKelasSelectedClass = kelasGuru.kelas;
+        currentUser.kelas = kelasGuru.kelas;
+        currentUser.guruKelas = kelasGuru.guru_kelas || '-';
+        currentUser.pembantuGuru = kelasGuru.pembantu_guru || kelasGuru.pembantu || '-';
 
         renderPage();
 
-        showToast(`Dashboard ${data.kelas} berjaya disegarkan.`, 'success');
+        showToast(`Dashboard ${kelasGuru.kelas} berjaya disegarkan.`, 'success');
 
     } catch (err) {
         console.error(err);
