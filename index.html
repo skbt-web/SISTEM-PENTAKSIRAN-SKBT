@@ -522,6 +522,7 @@
         let markStatusRows = [];
         let pbdStatusRows = [];
         let classVerificationRows = [];
+        let classTeacherRows = [];
         let guruKelasSelectedClass = '';
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
@@ -615,6 +616,21 @@
                     });
                 }
 
+                // Data Guru Kelas rasmi. Akses Guru Kelas ditapis melalui emel, bukan nama.
+                try {
+                    const { data: classTeacherData, error: classTeacherError } = await supabaseClient
+                        .from('class_teachers')
+                        .select('kelas,tahun,guru_kelas,guru_email,pembantu,pembantu_email');
+
+                    if (!classTeacherError && classTeacherData) {
+                        classTeacherRows = classTeacherData;
+                    } else {
+                        console.warn('Jadual class_teachers belum tersedia atau belum boleh dibaca.', classTeacherError);
+                    }
+                } catch (ctErr) {
+                    console.warn('Jadual class_teachers belum tersedia atau belum boleh dibaca.', ctErr);
+                }
+
                 // Data pengesahan Guru Kelas. Jika jadual belum dibuat, fungsi asal sistem tidak terganggu.
                 try {
                     const { data: verificationRows, error: verificationError } = await supabaseClient
@@ -644,7 +660,7 @@
                         ic: student.ic,
                         kelas: student.kelas,
                         tahun: getStudentYear(student.kelas),
-                        updated_at: new Date().toISOString()
+                        tarikh: new Date().toISOString()
                     }, { onConflict: 'ic' });
                 if (error) throw error;
             } catch (e) {
@@ -662,7 +678,7 @@
                     ic: student.ic,
                     kelas: student.kelas,
                     tahun: getStudentYear(student.kelas),
-                    updated_at: new Date().toISOString()
+                    tarikh: new Date().toISOString()
                 }));
 
                 const { error } = await supabaseClient
@@ -1185,7 +1201,7 @@ currentUser.fullName = namaGuru;
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
                                 kelas: selectedClass,
-                                updated_at: new Date().toISOString()
+                                tarikh: new Date().toISOString()
                             });
                             successCount++;
                         }
@@ -1205,7 +1221,7 @@ currentUser.fullName = namaGuru;
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
                                 kelas: selectedClass,
-                                updated_at: new Date().toISOString()
+                                tarikh: new Date().toISOString()
                             });
                         } else {
                             delete studentPBD[key];
@@ -2085,16 +2101,32 @@ currentUser.fullName = namaGuru;
 
 
         // --- ALIRAN RASMI GURU KELAS ---
+        function normalizeEmail(value) {
+            return String(value || '').toLowerCase().trim();
+        }
+
         function getAllowedGuruKelasClasses() {
-            const currentName = normalizeTeacherName(currentUser?.fullName || currentUser?.name || '');
-            const currentEmail = String(currentUser?.email || '').toLowerCase().trim();
-            return classTeacherAssignments.filter(item => {
-                const guruName = normalizeTeacherName(item.guru_kelas);
-                const pembantuName = normalizeTeacherName(item.pembantu);
-                return guruName === currentName || pembantuName === currentName ||
-                       guruName.includes(currentName) || pembantuName.includes(currentName) ||
-                       currentName.includes(guruName) || currentName.includes(pembantuName);
-            });
+            const currentEmail = normalizeEmail(currentUser?.email || '');
+
+            // Keutamaan: padanan emel daripada jadual Supabase class_teachers.
+            // Emel tidak dipaparkan dalam dashboard. Ia hanya digunakan untuk kawalan akses.
+            const rowsFromSupabase = (classTeacherRows || []).filter(item => {
+                const guruEmail = normalizeEmail(item.guru_email);
+                const pembantuEmail = normalizeEmail(item.pembantu_email);
+                return currentEmail && (guruEmail === currentEmail || pembantuEmail === currentEmail);
+            }).map(item => ({
+                kelas: item.kelas,
+                tahun: item.tahun,
+                guru_kelas: item.guru_kelas,
+                pembantu: item.pembantu || '-'
+            }));
+
+            if (rowsFromSupabase.length > 0) {
+                return rowsFromSupabase;
+            }
+
+            // Fallback tempatan untuk ujian sahaja jika jadual class_teachers belum diisi.
+            return [];
         }
 
         function getVerificationForClass(kelasName, jenis) {
@@ -2201,7 +2233,7 @@ currentUser.fullName = namaGuru;
         }
 
         function renderGuruKelasOfficialFlow(kelasName) {
-            const assignment = classTeacherAssignments.find(x => x.kelas === kelasName) || {};
+            const assignment = getAllowedGuruKelasClasses().find(x => x.kelas === kelasName) || classTeacherAssignments.find(x => x.kelas === kelasName) || {};
             const summary = getClassCompletionSummary(kelasName);
             const markahVerification = getVerificationForClass(kelasName, 'MARKAH');
             const pbdVerification = getVerificationForClass(kelasName, 'PBD');
@@ -2713,7 +2745,7 @@ currentUser.fullName = namaGuru;
                                 <i data-lucide="lock" class="w-7 h-7"></i>
                             </div>
                             <h3 class="text-lg font-black text-slate-800">Akses Guru Kelas Tidak Ditemui</h3>
-                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Nama akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak nama dalam jadual teachers dan tetapan Guru Kelas.</p>
+                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Emel akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak column guru_email dan pembantu_email dalam jadual class_teachers.</p>
                         </div>
                     `;
                 } else {
