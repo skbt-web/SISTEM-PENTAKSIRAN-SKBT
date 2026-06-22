@@ -958,7 +958,14 @@ if (!teacherError && teacher?.name) {
            
 currentUser.name = namaGuru;
 currentUser.fullName = namaGuru;
-                
+
+if (type === 'guru_kelas') {
+    setTimeout(async () => {
+        await loadGuruKelasByEmail(email);
+        renderPage();
+    }, 300);
+}
+
                 showApp();
                 
                 showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
