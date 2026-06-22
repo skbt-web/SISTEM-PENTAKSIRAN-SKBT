@@ -408,7 +408,7 @@
         ];
         const assessments = ['PENTAKSIRAN SUMATIF 1', 'PENTAKSIRAN SUMATIF 2', 'UJIAN AKHIR SESI AKADEMIK (UASA)'];
         
-        // 9 Mata Pelajaran mengikut etert.jpg
+        // 9 Matapelajaran mengikut etert.jpg
         const baseSubjects = [
             'BAHASA ARAB', 'BAHASA INGGERIS', 'BAHASA MELAYU', 'MATEMATIK', 'SAINS', 
             'PENDIDIKAN ISLAM', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK', 'PENDIDIKAN SENI VISUAL', 'SEJARAH', 'REKA BENTUK TEKNOLOGI'
@@ -424,6 +424,30 @@
             'DAYANG NURFARAHAIN FAEEZA BINTI HASSIM', 'NORZAIMAH BINTI ZAKARIA', 'RAZIDAH BINTI MOHAMAD',
             'NOOR HASLINDA BT. MOHD NASIRAN', 'SITI NOOR FAKHARIYAH BINTI MD SHAHID', 'VEETIYAH A/P SUROMUTHU'
         ];
+
+        // Tetapan rasmi Guru Kelas dan Pembantu Guru Kelas.
+        // Struktur asal dikekalkan. Senarai ini hanya digunakan untuk menapis Dashboard Guru Kelas.
+        const classTeacherAssignments = [
+            { kelas: '1 AR-RAZI', guru_kelas: 'PN. HJH. RUMINI BT. TUKIMAN', pembantu: 'PN. ADLIN FAZLINDA BINTI ASNAN' },
+            { kelas: '1 AL-KHAWARIZMI', guru_kelas: 'PN. PSPA LAILA BINTI OTHMAN', pembantu: 'PN. DAYANG NURFARAHAIN FAEEZA BINTI HASSIM' },
+            { kelas: '2 AR-RAZI', guru_kelas: 'PN. RAZIDAH BINTI MOHAMED', pembantu: 'PN. NOOR HASLINDA BINTI MOHD NASIRAN' },
+            { kelas: '2 AL-KHAWARIZMI', guru_kelas: 'CIK NURUL NAJIHAH BINTI SAHLAN', pembantu: 'EN. MOHD NOOR RASHID BIN WAGIMAN' },
+            { kelas: '3 AR-RAZI', guru_kelas: 'PN. SITI NOOR FAKHARIAH BINTI MD SHAHID', pembantu: '-' },
+            { kelas: '3 AL-KHAWARIZMI', guru_kelas: 'PN. MAISARATUL SYABRINA IZZATI BINTI MUHAMAD SHUKRI', pembantu: 'EN. MUZAFFAR AHMAD BIN ZAINAL ABIDIN' },
+            { kelas: '4 AR-RAZI', guru_kelas: 'PN. NORSAADAH BINTI JAILANI', pembantu: 'PN. ROSELINDA BINTI LAZIM' },
+            { kelas: '4 AL-KHAWARIZMI', guru_kelas: 'PN. HJH. NORZAIMAH BT. ZAKARIA', pembantu: 'PN. NORMAZIDA BINTI AHMAD' },
+            { kelas: '5 AR-RAZI', guru_kelas: 'EN. MOHAMAD HIJRAN BIN AHMAD IDRUS', pembantu: 'PN. VEETIYAH A/P SUROMUTHU' },
+            { kelas: '6 AR-RAZI', guru_kelas: 'PN. NORAZLINAWATI BT. MAHMOOD', pembantu: 'EN. KHAIRULAZMAN BIN DOLLAH' },
+            { kelas: '6 AL-KHAWARIZMI', guru_kelas: 'EN. ZULKARNAIN BIN M. AYOB', pembantu: 'PN. SYAHMINA WARDAH BINTI SUARDI' }
+        ];
+
+        function normalizeTeacherName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/(PN|PUAN|EN|ENCIK|CIK|HJH|HJ|BT|BIN|BINTI)\.?/g, '')
+                .replace(/[^A-Z0-9]/g, '')
+                .trim();
+        }
 
         // Database Markah Sementara (In-Memory)
         const studentMarks = {
@@ -497,6 +521,8 @@
         let tempUploadedStudents = [];
         let markStatusRows = [];
         let pbdStatusRows = [];
+        let classVerificationRows = [];
+        let guruKelasSelectedClass = '';
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
             const parts = String(key).split('_');
@@ -587,6 +613,19 @@
                     pbdRows.forEach(row => {
                         if (row.key) studentPBD[row.key] = row.value;
                     });
+                }
+
+                // Data pengesahan Guru Kelas. Jika jadual belum dibuat, fungsi asal sistem tidak terganggu.
+                try {
+                    const { data: verificationRows, error: verificationError } = await supabaseClient
+                        .from('class_verifications')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    if (!verificationError && verificationRows) {
+                        classVerificationRows = verificationRows;
+                    }
+                } catch (vErr) {
+                    console.warn('Jadual class_verifications belum tersedia atau belum boleh dibaca.', vErr);
                 }
             } catch (e) {
                 console.error('Error retrieving Supabase data:', e);
@@ -2044,6 +2083,248 @@ currentUser.fullName = namaGuru;
             `;
         }
 
+
+        // --- ALIRAN RASMI GURU KELAS ---
+        function getAllowedGuruKelasClasses() {
+            const currentName = normalizeTeacherName(currentUser?.fullName || currentUser?.name || '');
+            const currentEmail = String(currentUser?.email || '').toLowerCase().trim();
+            return classTeacherAssignments.filter(item => {
+                const guruName = normalizeTeacherName(item.guru_kelas);
+                const pembantuName = normalizeTeacherName(item.pembantu);
+                return guruName === currentName || pembantuName === currentName ||
+                       guruName.includes(currentName) || pembantuName.includes(currentName) ||
+                       currentName.includes(guruName) || currentName.includes(pembantuName);
+            });
+        }
+
+        function getVerificationForClass(kelasName, jenis) {
+            return (classVerificationRows || []).find(row =>
+                row.kelas === kelasName &&
+                String(row.tahun) === String(selectedYear) &&
+                row.assessment === selectedAssessment &&
+                row.jenis === jenis
+            );
+        }
+
+        function getClassCompletionSummary(kelasName) {
+            const classStudents = students.filter(s => s.kelas === kelasName);
+            const totalStudents = classStudents.length;
+            const subjectList = getSubjectsForClass(kelasName);
+            let completedSubjects = 0;
+            let partialSubjects = 0;
+            let totalFilled = 0;
+
+            subjectList.forEach(sub => {
+                const filled = new Set((markStatusRows || []).filter(row =>
+                    row.kelas === kelasName &&
+                    row.subject === sub &&
+                    row.assessment === selectedAssessment &&
+                    String(row.tahun) === String(selectedYear)
+                ).map(row => String(row.student_id))).size;
+
+                totalFilled += filled;
+                if (totalStudents > 0 && filled >= totalStudents) completedSubjects++;
+                else if (filled > 0) partialSubjects++;
+            });
+
+            const totalRequired = totalStudents * subjectList.length;
+            const percent = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 0;
+            return { totalStudents, subjectCount: subjectList.length, completedSubjects, partialSubjects, totalFilled, totalRequired, percent };
+        }
+
+        function getSubjectsForClass(kelasName) {
+            const yearLevel = parseInt(String(kelasName || '').charAt(0), 10) || 1;
+            const tahap1 = ['BAHASA MELAYU', 'BAHASA INGGERIS', 'MATEMATIK', 'SAINS', 'PENDIDIKAN ISLAM', 'BAHASA ARAB', 'PENDIDIKAN SENI VISUAL', 'PENDIDIKAN JASMANI DAN KESIHATAN', 'MUZIK'];
+            const tahap2 = [...tahap1, 'SEJARAH', 'REKA BENTUK TEKNOLOGI'];
+            return yearLevel <= 3 ? tahap1 : tahap2;
+        }
+
+        async function submitClassVerification(jenis) {
+            if (!supabaseEnabled || !supabaseClient) {
+                showToast('Supabase belum disambungkan.', 'danger');
+                return;
+            }
+            if (!guruKelasSelectedClass) {
+                showToast('Sila pilih kelas terlebih dahulu.', 'warning');
+                return;
+            }
+
+            const payload = {
+                kelas: guruKelasSelectedClass,
+                tahun: String(selectedYear),
+                assessment: selectedAssessment,
+                jenis,
+                guru_kelas: currentUser?.name || 'Guru Kelas',
+                guru_email: currentUser?.email || null,
+                status: 'Menunggu Semakan Admin',
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                const { error } = await supabaseClient
+                    .from('class_verifications')
+                    .upsert(payload, { onConflict: 'kelas,tahun,assessment,jenis' });
+                if (error) throw error;
+                await fetchAllDataFromSupabase();
+                showToast(`${jenis} ${guruKelasSelectedClass} telah dihantar ke Dashboard Admin.`, 'success');
+                renderPage();
+            } catch (e) {
+                console.error('Gagal hantar pengesahan guru kelas:', e);
+                showToast('Gagal hantar pengesahan. Pastikan SQL class_verifications telah dijalankan.', 'danger');
+            }
+        }
+
+        function renderVerificationStatus(status) {
+            if (status === 'Disahkan Admin') return '<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black">DISAHKAN ADMIN</span>';
+            if (status === 'Perlu Pembetulan') return '<span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-black">PERLU PEMBETULAN</span>';
+            return '<span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black">MENUNGGU SEMAKAN ADMIN</span>';
+        }
+
+        function renderGuruKelasOfficialFlow(kelasName) {
+            const assignment = classTeacherAssignments.find(x => x.kelas === kelasName) || {};
+            const summary = getClassCompletionSummary(kelasName);
+            const markahVerification = getVerificationForClass(kelasName, 'MARKAH');
+            const pbdVerification = getVerificationForClass(kelasName, 'PBD');
+
+            return `
+                <div class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-blue-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="workflow" class="w-5 h-5 text-purple-600"></i>
+                                Aliran Rasmi Semakan Guru Kelas
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">Guru Kelas dan Pembantu Guru Kelas sahaja boleh mengesahkan kelas ini.</p>
+                        </div>
+                        <div class="no-print flex flex-wrap items-center gap-2">
+                            <select onchange="guruKelasSelectedClass=this.value; renderPage()" class="p-2 border border-purple-100 rounded-xl text-xs font-bold outline-none bg-white">
+                                ${getAllowedGuruKelasClasses().map(a => `<option value="${a.kelas}" ${guruKelasSelectedClass===a.kelas?'selected':''}>${a.kelas}</option>`).join('')}
+                            </select>
+                            <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Data semakan telah disegerakkan.', 'success'); renderPage();})" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-slate-100">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p class="text-[10px] font-black text-slate-400 uppercase">Kelas</p>
+                            <h4 class="text-xl font-black text-slate-800">${kelasName}</h4>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">${summary.totalStudents} murid</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <p class="text-[10px] font-black text-blue-400 uppercase">Guru Kelas</p>
+                            <h4 class="text-sm font-black text-blue-900 leading-snug">${assignment.guru_kelas || '-'}</h4>
+                            <p class="text-[11px] text-blue-600 font-semibold mt-1">Pembantu: ${assignment.pembantu || '-'}</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100">
+                            <p class="text-[10px] font-black text-purple-400 uppercase">Kemajuan Lengkap</p>
+                            <h4 class="text-xl font-black text-purple-800">${summary.percent}%</h4>
+                            <div class="mt-2 h-2 bg-white rounded-full overflow-hidden border border-purple-100">
+                                <div class="h-full bg-purple-600" style="width:${summary.percent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="border border-slate-100 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="font-black text-slate-800 text-sm">Pengesahan Pentaksiran</h4>
+                                    <p class="text-[11px] text-slate-400 font-semibold">Hantar status markah kepada Dashboard Admin.</p>
+                                </div>
+                                ${markahVerification ? renderVerificationStatus(markahVerification.status) : '<span class="text-[10px] font-black text-slate-400">BELUM DIHANTAR</span>'}
+                            </div>
+                            <button onclick="submitClassVerification('MARKAH')" class="no-print w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
+                                <i data-lucide="send" class="w-4 h-4"></i> HANTAR PENGESAHAN PENTAKSIRAN
+                            </button>
+                        </div>
+                        <div class="border border-slate-100 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h4 class="font-black text-slate-800 text-sm">Pengesahan PBD</h4>
+                                    <p class="text-[11px] text-slate-400 font-semibold">Hantar status PBD kepada Dashboard Admin.</p>
+                                </div>
+                                ${pbdVerification ? renderVerificationStatus(pbdVerification.status) : '<span class="text-[10px] font-black text-slate-400">BELUM DIHANTAR</span>'}
+                            </div>
+                            <button onclick="submitClassVerification('PBD')" class="no-print w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2">
+                                <i data-lucide="send" class="w-4 h-4"></i> HANTAR PENGESAHAN PBD
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function updateAdminVerification(id, status) {
+            try {
+                const { error } = await supabaseClient
+                    .from('class_verifications')
+                    .update({ status, updated_at: new Date().toISOString() })
+                    .eq('id', id);
+                if (error) throw error;
+                await fetchAllDataFromSupabase();
+                showToast(`Status telah dikemas kini: ${status}`, 'success');
+                renderPage();
+            } catch (e) {
+                console.error('Gagal kemas kini pengesahan admin:', e);
+                showToast('Gagal kemas kini status pengesahan.', 'danger');
+            }
+        }
+
+        function renderAdminClassVerificationPanel() {
+            const rows = (classVerificationRows || []).filter(r => String(r.tahun) === String(selectedYear) && r.assessment === selectedAssessment);
+            return `
+                <div class="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i>
+                                Pengesahan Guru Kelas Untuk Admin
+                            </h3>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-1">Semak pengesahan pentaksiran dan PBD yang dihantar oleh Guru Kelas.</p>
+                        </div>
+                        <button onclick="fetchAllDataFromSupabase().then(()=>{showToast('Pengesahan admin telah disegerakkan.', 'success'); renderPage();})" class="no-print px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4">Pentaksiran</th>
+                                    <th class="p-4">Jenis</th>
+                                    <th class="p-4">Guru Kelas</th>
+                                    <th class="p-4">Tarikh</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                ${rows.length === 0 ? `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-bold">Belum ada pengesahan Guru Kelas.</td></tr>` : rows.map(r => `
+                                    <tr class="hover:bg-slate-50/60">
+                                        <td class="p-4 font-black text-slate-800">${r.kelas}</td>
+                                        <td class="p-4 text-slate-600 font-semibold">${r.assessment}</td>
+                                        <td class="p-4 font-black text-blue-700">${r.jenis}</td>
+                                        <td class="p-4 text-slate-600 font-semibold">${r.guru_kelas || '-'}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at || r.created_at)}</td>
+                                        <td class="p-4 text-center">${renderVerificationStatus(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <div class="flex items-center justify-center gap-2">
+                                                <button onclick="updateAdminVerification(${r.id}, 'Disahkan Admin')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black">SAHKAN</button>
+                                                <button onclick="updateAdminVerification(${r.id}, 'Perlu Pembetulan')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-black">PULANGKAN</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
         // --- RENDER DYNAMIC PAGES ---
         function renderPage() {
             const content = document.getElementById('page-content');
@@ -2082,7 +2363,7 @@ currentUser.fullName = namaGuru;
                                 <div class="theme-soft-orange p-3.5 rounded-xl"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
                                 <div>
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">Subjek Teras Dipantau</p>
-                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Mata Pelajaran</h4>
+                                    <h4 class="text-2xl font-bold text-gray-800">${totalSubjects} Matapelajaran</h4>
                                 </div>
                             </div>
                         </div>
@@ -2119,6 +2400,7 @@ currentUser.fullName = namaGuru;
                         </div>
 
                         ${isAdmin ? renderFillingStatusPanel('admin') : ''}
+                        ${isAdmin ? renderAdminClassVerificationPanel() : ''}
                         ${(!isAdmin && currentUser?.role === 'Guru') ? renderTeacherOwnStatusPanel() : ''}
                     </div>
                 `;
@@ -2247,7 +2529,7 @@ currentUser.fullName = namaGuru;
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-[10px] font-bold text-gray-400 uppercase">Mata Pelajaran</label>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Matapelajaran</label>
                                 <select id="sel-subject" onchange="handleFilterChange()" class="w-full p-2 border border-gray-100 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-500">
                                     ${subjectsToUse.map(s => `<option value="${s}" ${selectedSubject===s?'selected':''}>${s}</option>`).join('')}
                                 </select>
@@ -2399,48 +2681,67 @@ currentUser.fullName = namaGuru;
             }
 
             else if (currentPage === 'guru_kelas_dashboard') {
-                const assignedClass = '1 AR-RAZI';
-                const classStudents = students.filter(s => s.kelas === assignedClass);
+                const allowedClasses = getAllowedGuruKelasClasses();
+                if (!guruKelasSelectedClass && allowedClasses.length > 0) {
+                    guruKelasSelectedClass = allowedClasses[0].kelas;
+                }
 
-                content.innerHTML = `
-                    <div class="space-y-6">
-                        <div class="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-3xl shadow-sm border border-purple-500/10 relative overflow-hidden">
-                            <div class="relative z-10 space-y-1">
-                                <h3 class="text-lg md:text-xl font-bold tracking-tight">Kabin Kawalan Guru Kelas: ${assignedClass}</h3>
-                                <p class="text-[11px] md:text-xs text-teal-100 font-medium">Uruskan, jejak, dan semak penyata akhir UASA murid anda.</p>
+                if (allowedClasses.length === 0) {
+                    content.innerHTML = `
+                        <div class="bg-white p-8 rounded-3xl border border-rose-100 shadow-sm space-y-3 text-center">
+                            <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                                <i data-lucide="lock" class="w-7 h-7"></i>
                             </div>
-                            <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
+                            <h3 class="text-lg font-black text-slate-800">Akses Guru Kelas Tidak Ditemui</h3>
+                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Nama akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak nama dalam jadual teachers dan tetapan Guru Kelas.</p>
                         </div>
+                    `;
+                } else {
+                    const assignedClass = guruKelasSelectedClass;
+                    const classStudents = students.filter(s => s.kelas === assignedClass);
 
-                        ${renderFillingStatusPanel('guru_kelas', assignedClass)}
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-3xl shadow-sm border border-purple-500/10 relative overflow-hidden">
+                                <div class="relative z-10 space-y-1">
+                                    <h3 class="text-lg md:text-xl font-bold tracking-tight">Dashboard Guru Kelas: ${assignedClass}</h3>
+                                    <p class="text-[11px] md:text-xs text-purple-100 font-medium">Aliran rasmi semakan pentaksiran, PBD dan pengesahan kepada Admin.</p>
+                                </div>
+                                <i data-lucide="presentation" class="absolute right-6 bottom-4 w-24 h-24 opacity-10 rotate-6"></i>
+                            </div>
 
-                        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-                            <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
-                            <div class="overflow-y-auto max-h-[400px]">
-                                <table class="w-full text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                            <th class="p-3">Nama Murid</th>
-                                            <th class="p-3">No. MyKad</th>
-                                            <th class="p-3 text-right">Perincian</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-50">
-                                        ${classStudents.map(cs => `
-                                            <tr class="hover:bg-slate-50/20">
-                                                <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
-                                                <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
-                                                <td class="p-3 text-right">
-                                                    <button onclick="viewStudentPerformance(${cs.id})" class="text-purple-600 hover:underline font-bold">Analisis</button>
-                                                </td>
+                            ${renderGuruKelasOfficialFlow(assignedClass)}
+
+                            ${renderFillingStatusPanel('guru_kelas', assignedClass)}
+
+                            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                                <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i> Senarai Roster Kelas (${classStudents.length} Murid)</h3>
+                                <div class="overflow-y-auto max-h-[400px]">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                <th class="p-3">Nama Murid</th>
+                                                <th class="p-3">No. MyKad</th>
+                                                <th class="p-3 text-right">Perincian</th>
                                             </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-50">
+                                            ${classStudents.map(cs => `
+                                                <tr class="hover:bg-slate-50/20">
+                                                    <td class="p-3 font-bold text-slate-800">${cs.nama}</td>
+                                                    <td class="p-3 text-slate-500 font-medium">${cs.ic}</td>
+                                                    <td class="p-3 text-right">
+                                                        <button onclick="viewStudentPerformance(${cs.id})" class="text-purple-600 hover:underline font-bold">Analisis</button>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
 
             lucide.createIcons();
@@ -2955,7 +3256,7 @@ currentUser.fullName = namaGuru;
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th class="p-3">Mata Pelajaran</th>
+                                        <th class="p-3">Matapelajaran</th>
                                         <th class="p-3 text-center">Markah</th>
                                         <th class="p-3 text-center">Gred</th>
                                         <th class="p-3 text-center">PBD TP</th>
@@ -3016,53 +3317,6 @@ currentUser.fullName = namaGuru;
             renderPage();
         };
     </script>
-
-    <script>
-   (function() {
-    'use strict';
-
-    // 1. PENGURUSAN KLIK KANAN (CONTEXT MENU)
-    document.addEventListener('contextmenu', function(e) {
-        // Hanya benarkan klik kanan jika berada di dalam elemen '.dalam-sistem'
-        if (e.target.closest('.dalam-sistem')) {
-            return true; 
-        } else {
-            e.preventDefault(); // Lock bahagian lain secara senyap
-        }
-    });
-
-    // 2. PENGURUSAN PINTASAN PAPAN KEKUNCI (KEYBOARD)
-    document.addEventListener('keydown', function(e) {
-        const isDalamSistem = e.target.closest('.dalam-sistem');
-
-        // LOCK fungsi salin (Ctrl+C / Ctrl+X) jika pengguna berada di LUAR sistem
-        if (!isDalamSistem && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
-            e.preventDefault();
-            return false;
-        }
-
-        // LOCK GLOBAL (Sentiasa sekat Inspect Element & View Source di mana-mana bahagian pun)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'u') { // Ctrl+U (View Source)
-            e.preventDefault();
-            return false;
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') { // Ctrl+S (Save Page)
-            e.preventDefault();
-            return false;
-        }
-        if ( // F12 & Ctrl+Shift+I/J/C (Inspect Element)
-            e.key === 'F12' || 
-            ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
-        ) {
-            e.preventDefault();
-            return false;
-        }
-    });
-
-    // 3. ANTI-DEBUGGER dinyahaktifkan kerana loop rekursif menyebabkan fungsi login tersekat.
-
-})();
-    </script>    
 
 </body>
 </html>
