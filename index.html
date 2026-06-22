@@ -1102,34 +1102,46 @@ if (type === 'guru_kelas') {
             }
         }
         // LETAK KOD REFRESH DI SINI
-async function refreshGuruKelasDashboard() {
+        async function refreshGuruKelasDashboard() {
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
+        await fetchAllDataFromSupabase();
 
-        if (!user) return;
+        const emailGuru = currentUser?.email?.toLowerCase().trim();
 
-        const emailGuru = user.email.toLowerCase().trim();
+        if (!emailGuru) {
+            showToast('Emel guru tidak dikesan. Sila login semula.', 'warning');
+            return;
+        }
 
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('class_teachers')
             .select('*')
             .or(`guru_kelas_email.eq.${emailGuru},pembantu_email.eq.${emailGuru}`)
             .maybeSingle();
 
-        if (data) {
-            guruKelasSelectedClass = data.kelas;
-
-            currentUser.kelas = data.kelas;
-            currentUser.guruKelas = data.guru_kelas;
-            currentUser.pembantuGuru = data.pembantu_guru;
-
-            renderPage();
-
-            showToast(`Kelas ${data.kelas} berjaya dipulihkan.`, 'success');
+        if (error) {
+            console.error('Ralat Guru Kelas:', error);
+            showToast('Gagal semak data Guru Kelas.', 'danger');
+            return;
         }
+
+        if (!data) {
+            showToast('Emel ini belum didaftarkan sebagai Guru Kelas atau Pembantu Guru Kelas.', 'warning');
+            return;
+        }
+
+        guruKelasSelectedClass = data.kelas;
+        currentUser.kelas = data.kelas;
+        currentUser.guruKelas = data.guru_kelas || '-';
+        currentUser.pembantuGuru = data.pembantu_guru || '-';
+
+        renderPage();
+
+        showToast(`Dashboard ${data.kelas} berjaya disegarkan.`, 'success');
+
     } catch (err) {
         console.error(err);
-        showToast('Gagal menyegarkan dashboard.', 'danger');
+        showToast('Gagal menyegarkan Dashboard Guru Kelas.', 'danger');
     }
 }
         // --- TOAST SYSTEMS ---
@@ -2294,7 +2306,6 @@ class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs fon
     <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
     Refresh
 </button>
-                            </button>
                         </div>
                     </div>
 
