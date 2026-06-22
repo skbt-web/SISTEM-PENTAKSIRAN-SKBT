@@ -620,7 +620,7 @@
                 try {
                     const { data: classTeacherData, error: classTeacherError } = await supabaseClient
                         .from('class_teachers')
-                        .select('kelas,tahun,guru_kelas,guru_email,pembantu,pembantu_email');
+                        .select('*');
 
                     if (!classTeacherError && classTeacherData) {
                         classTeacherRows = classTeacherData;
@@ -660,7 +660,7 @@
                         ic: student.ic,
                         kelas: student.kelas,
                         tahun: getStudentYear(student.kelas),
-                        tarikh: new Date().toISOString()
+                        updated_at: new Date().toISOString()
                     }, { onConflict: 'ic' });
                 if (error) throw error;
             } catch (e) {
@@ -678,7 +678,7 @@
                     ic: student.ic,
                     kelas: student.kelas,
                     tahun: getStudentYear(student.kelas),
-                    tarikh: new Date().toISOString()
+                    updated_at: new Date().toISOString()
                 }));
 
                 const { error } = await supabaseClient
@@ -1201,7 +1201,7 @@ currentUser.fullName = namaGuru;
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
                                 kelas: selectedClass,
-                                tarikh: new Date().toISOString()
+                                updated_at: new Date().toISOString()
                             });
                             successCount++;
                         }
@@ -1221,7 +1221,7 @@ currentUser.fullName = namaGuru;
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
                                 kelas: selectedClass,
-                                tarikh: new Date().toISOString()
+                                updated_at: new Date().toISOString()
                             });
                         } else {
                             delete studentPBD[key];
@@ -2111,14 +2111,14 @@ currentUser.fullName = namaGuru;
             // Keutamaan: padanan emel daripada jadual Supabase class_teachers.
             // Emel tidak dipaparkan dalam dashboard. Ia hanya digunakan untuk kawalan akses.
             const rowsFromSupabase = (classTeacherRows || []).filter(item => {
-                const guruEmail = normalizeEmail(item.guru_email);
+                const guruEmail = normalizeEmail(item.guru_email || item.guru_kelas_email);
                 const pembantuEmail = normalizeEmail(item.pembantu_email);
                 return currentEmail && (guruEmail === currentEmail || pembantuEmail === currentEmail);
             }).map(item => ({
                 kelas: item.kelas,
                 tahun: item.tahun,
                 guru_kelas: item.guru_kelas,
-                pembantu: item.pembantu || '-'
+                pembantu: item.pembantu || item.pembantu_guru || '-'
             }));
 
             if (rowsFromSupabase.length > 0) {
