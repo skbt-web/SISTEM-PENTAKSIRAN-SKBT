@@ -889,7 +889,7 @@
 
         // --- HANDLERS ---
         async function handleLogin(type) {
-            const email = document.getElementById('email').value.trim();
+            const email = document.getElementById('email').value.trim().toLowerCase();
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('login-error');
 
@@ -937,39 +937,47 @@
                 };
 
                 isAdmin = type === 'admin';
+
+                // Kosongkan state setiap kali login supaya data akaun lama tidak melekat.
+                guruKelasSelectedClass = '';
+                classTeacherRows = [];
+                classVerificationRows = [];
+
                 await fetchAllDataFromSupabase();
+
                 let namaGuru = "Guru";
-                
-                try{
-                const emailGuru = (await supabaseClient.auth.getUser()).data.user.email;
+                try {
+                    const emailGuru = (await supabaseClient.auth.getUser()).data.user.email.toLowerCase();
 
-const { data: teacher,error: teacherError } = await supabaseClient
-  .from("teachers")
-  .select("name")
-  .eq("email", emailGuru)
-  .maybeSingle();
+                    const { data: teacher, error: teacherError } = await supabaseClient
+                        .from("teachers")
+                        .select("name")
+                        .eq("email", emailGuru)
+                        .maybeSingle();
 
-if (!teacherError && teacher?.name) {
-    namaGuru = teacher.name;
-  }
-} catch (e) {
-  console.error("Ralat ambil nama guru:", e);
-}
-           
-currentUser.name = namaGuru;
-currentUser.fullName = namaGuru;
+                    if (!teacherError && teacher?.name) {
+                        namaGuru = teacher.name;
+                    }
+                } catch (e) {
+                    console.error("Ralat ambil nama guru:", e);
+                }
 
-if (type === 'guru_kelas') {
-    setTimeout(async () => {
-        await loadGuruKelasByEmail(email);
-        renderPage();
-    }, 300);
-}
+                currentUser.name = namaGuru;
+                currentUser.fullName = namaGuru;
+
+                // Muatkan kelas guru kelas sebelum showApp() supaya tidak perlu refresh atau login dua kali.
+                if (type === 'guru_kelas') {
+                    const kelasGuru = await loadGuruKelasByEmail(email);
+                    if (!kelasGuru) {
+                        await supabaseClient.auth.signOut();
+                        showError('Emel ini belum didaftarkan sebagai Guru Kelas atau Pembantu Guru Kelas.');
+                        return;
+                    }
+                }
 
                 showApp();
-                
                 showToast(`👋 Selamat datang, ${currentUser.name}!`, 'success');
-                
+
             } catch (err) {
                 console.error('Login Supabase gagal:', err);
                 showError('Log masuk gagal: ' + (err.message || 'Semak emel, kata laluan dan akaun Supabase Auth.'));
@@ -985,7 +993,15 @@ if (type === 'guru_kelas') {
             if (supabaseEnabled && supabaseClient) {
                 await supabaseClient.auth.signOut();
             }
+
             currentUser = null;
+            isAdmin = false;
+            guruKelasSelectedClass = '';
+            classTeacherRows = [];
+            classVerificationRows = [];
+            markStatusRows = [];
+            pbdStatusRows = [];
+
             document.getElementById('login-page').classList.remove('hidden');
             document.getElementById('app-container').classList.add('hidden');
             document.getElementById('email').value = '';
@@ -2112,28 +2128,101 @@ if (type === 'guru_kelas') {
             return String(value || '').toLowerCase().trim();
         }
 
+        function normalizeClassName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/\s+/g, ' ')
+                .replace(/\bAR\s+RAZI\b/g, 'AR-RAZI')
+                .replace(/\bAL\s+KHAWARIZMI\b/g, 'AL-KHAWARIZMI')
+                .trim();
+        }
+
+        async function loadGuruKelasByEmail(emailGuru) {
+            if (!supabaseEnabled || !supabaseClient || !currentUser) return null;
+
+            const cleanEmail = normalizeEmail(emailGuru);
+            if (!cleanEmail) return null;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('class_teachers')
+                    .select('*')
+                    .or(`guru_kelas_email.eq.${cleanEmail},pembantu_email.eq.${cleanEmail}`)
+                    .maybeSingle();
+
+                if (error) {
+                    console.error('Gagal ambil kelas guru kelas:', error);
+                    guruKelasSelectedClass = '';
+                    currentUser.kelas = '';
+                    return null;
+                }
+
+                if (data?.kelas) {
+                    const kelasBersih = normalizeClassName(data.kelas);
+                    const rowBersih = {
+                        ...data,
+                        kelas: kelasBersih,
+                        pembantu: data.pembantu || data.pembantu_guru || '-'
+                    };
+
+                    currentUser.kelas = kelasBersih;
+                    currentUser.guruKelas = data.guru_kelas || '-';
+                    currentUser.guruKelasEmail = data.guru_kelas_email || data.guru_email || '';
+                    currentUser.pembantuGuru = data.pembantu_guru || data.pembantu || '-';
+                    currentUser.pembantuEmail = data.pembantu_email || '';
+                    guruKelasSelectedClass = kelasBersih;
+
+                    const exists = (classTeacherRows || []).some(item =>
+                        normalizeClassName(item.kelas) === kelasBersih &&
+                        (
+                            normalizeEmail(item.guru_kelas_email || item.guru_email) === cleanEmail ||
+                            normalizeEmail(item.pembantu_email) === cleanEmail
+                        )
+                    );
+
+                    if (!exists) classTeacherRows = [rowBersih, ...(classTeacherRows || [])];
+
+                    return rowBersih;
+                }
+
+                guruKelasSelectedClass = '';
+                currentUser.kelas = '';
+                return null;
+
+            } catch (e) {
+                console.error('Ralat loadGuruKelasByEmail:', e);
+                guruKelasSelectedClass = '';
+                currentUser.kelas = '';
+                return null;
+            }
+        }
+
         function getAllowedGuruKelasClasses() {
             const currentEmail = normalizeEmail(currentUser?.email || '');
 
-            // Keutamaan: padanan emel daripada jadual Supabase class_teachers.
-            // Emel tidak dipaparkan dalam dashboard. Ia hanya digunakan untuk kawalan akses.
+            // Utamakan kelas yang telah dimuat terus semasa login Guru Kelas.
+            if (currentUser?.kelas) {
+                return [{
+                    kelas: normalizeClassName(currentUser.kelas),
+                    tahun: getStudentYear(currentUser.kelas),
+                    guru_kelas: currentUser.guruKelas || '-',
+                    pembantu: currentUser.pembantuGuru || '-'
+                }];
+            }
+
+            // Padanan emel daripada jadual Supabase class_teachers.
             const rowsFromSupabase = (classTeacherRows || []).filter(item => {
-                const guruEmail = normalizeEmail(item.guru_email || item.guru_kelas_email);
+                const guruEmail = normalizeEmail(item.guru_kelas_email || item.guru_email);
                 const pembantuEmail = normalizeEmail(item.pembantu_email);
                 return currentEmail && (guruEmail === currentEmail || pembantuEmail === currentEmail);
             }).map(item => ({
-                kelas: item.kelas,
-                tahun: item.tahun,
-                guru_kelas: item.guru_kelas,
+                kelas: normalizeClassName(item.kelas),
+                tahun: item.tahun || getStudentYear(item.kelas),
+                guru_kelas: item.guru_kelas || '-',
                 pembantu: item.pembantu || item.pembantu_guru || '-'
             }));
 
-            if (rowsFromSupabase.length > 0) {
-                return rowsFromSupabase;
-            }
-
-            // Fallback tempatan untuk ujian sahaja jika jadual class_teachers belum diisi.
-            return [];
+            return rowsFromSupabase;
         }
 
         function getVerificationForClass(kelasName, jenis) {
@@ -2741,7 +2830,7 @@ if (type === 'guru_kelas') {
 
             else if (currentPage === 'guru_kelas_dashboard') {
                 const allowedClasses = getAllowedGuruKelasClasses();
-                if (!guruKelasSelectedClass && allowedClasses.length > 0) {
+                if (allowedClasses.length > 0 && !allowedClasses.some(a => a.kelas === guruKelasSelectedClass)) {
                     guruKelasSelectedClass = allowedClasses[0].kelas;
                 }
 
@@ -2752,7 +2841,7 @@ if (type === 'guru_kelas') {
                                 <i data-lucide="lock" class="w-7 h-7"></i>
                             </div>
                             <h3 class="text-lg font-black text-slate-800">Akses Guru Kelas Tidak Ditemui</h3>
-                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Emel akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak column guru_email dan pembantu_email dalam jadual class_teachers.</p>
+                            <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Emel akaun ini belum dipadankan sebagai Guru Kelas atau Pembantu Guru Kelas. Sila semak column guru_kelas_email dan pembantu_email dalam jadual class_teachers.</p>
                         </div>
                     `;
                 } else {
