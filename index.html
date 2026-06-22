@@ -444,7 +444,7 @@
         function normalizeTeacherName(value) {
             return String(value || '')
                 .toUpperCase()
-                .replace(/(PN|PUAN|EN|ENCIK|CIK|HJH|HJ|BT|BIN|BINTI)\.?/g, '')
+                .replace(/\b(PN|PUAN|EN|ENCIK|CIK|HJH|HJ|BT|BIN|BINTI)\.?\b/g, '')
                 .replace(/[^A-Z0-9]/g, '')
                 .trim();
         }
@@ -618,14 +618,14 @@
                 // Data pengesahan Guru Kelas. Jika jadual belum dibuat, fungsi asal sistem tidak terganggu.
                 try {
                     const { data: verificationRows, error: verificationError } = await supabaseClient
-                        .from('class_verifications')
+                        .from('semakan_guru_kelas')
                         .select('*')
-                        .order('created_at', { ascending: false });
+                        .order('tarikh', { ascending: false });
                     if (!verificationError && verificationRows) {
                         classVerificationRows = verificationRows;
                     }
                 } catch (vErr) {
-                    console.warn('Jadual class_verifications belum tersedia atau belum boleh dibaca.', vErr);
+                    console.warn('Jadual semakan_guru_kelas belum tersedia atau belum boleh dibaca.', vErr);
                 }
             } catch (e) {
                 console.error('Error retrieving Supabase data:', e);
@@ -2157,20 +2157,40 @@ currentUser.fullName = namaGuru;
                 guru_kelas: currentUser?.name || 'Guru Kelas',
                 guru_email: currentUser?.email || null,
                 status: 'Menunggu Semakan Admin',
-                updated_at: new Date().toISOString()
+                tarikh: new Date().toISOString()
             };
 
             try {
-                const { error } = await supabaseClient
-                    .from('class_verifications')
-                    .upsert(payload, { onConflict: 'kelas,tahun,assessment,jenis' });
-                if (error) throw error;
+                const { data: existingRows, error: findError } = await supabaseClient
+                    .from('semakan_guru_kelas')
+                    .select('id')
+                    .eq('kelas', payload.kelas)
+                    .eq('tahun', payload.tahun)
+                    .eq('assessment', payload.assessment)
+                    .eq('jenis', payload.jenis)
+                    .limit(1);
+
+                if (findError) throw findError;
+
+                if (existingRows && existingRows.length > 0) {
+                    const { error: updateError } = await supabaseClient
+                        .from('semakan_guru_kelas')
+                        .update(payload)
+                        .eq('id', existingRows[0].id);
+                    if (updateError) throw updateError;
+                } else {
+                    const { error: insertError } = await supabaseClient
+                        .from('semakan_guru_kelas')
+                        .insert(payload);
+                    if (insertError) throw insertError;
+                }
+
                 await fetchAllDataFromSupabase();
                 showToast(`${jenis} ${guruKelasSelectedClass} telah dihantar ke Dashboard Admin.`, 'success');
                 renderPage();
             } catch (e) {
                 console.error('Gagal hantar pengesahan guru kelas:', e);
-                showToast('Gagal hantar pengesahan. Pastikan SQL class_verifications telah dijalankan.', 'danger');
+                showToast('Gagal hantar pengesahan. Pastikan jadual semakan_guru_kelas dan RLS betul.', 'danger');
             }
         }
 
@@ -2259,8 +2279,8 @@ currentUser.fullName = namaGuru;
         async function updateAdminVerification(id, status) {
             try {
                 const { error } = await supabaseClient
-                    .from('class_verifications')
-                    .update({ status, updated_at: new Date().toISOString() })
+                    .from('semakan_guru_kelas')
+                    .update({ status, tarikh: new Date().toISOString() })
                     .eq('id', id);
                 if (error) throw error;
                 await fetchAllDataFromSupabase();
@@ -2308,7 +2328,7 @@ currentUser.fullName = namaGuru;
                                         <td class="p-4 text-slate-600 font-semibold">${r.assessment}</td>
                                         <td class="p-4 font-black text-blue-700">${r.jenis}</td>
                                         <td class="p-4 text-slate-600 font-semibold">${r.guru_kelas || '-'}</td>
-                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at || r.created_at)}</td>
+                                        <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.tarikh)}</td>
                                         <td class="p-4 text-center">${renderVerificationStatus(r.status)}</td>
                                         <td class="p-4 text-center no-print">
                                             <div class="flex items-center justify-center gap-2">
