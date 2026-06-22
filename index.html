@@ -2301,11 +2301,10 @@ if (type === 'guru_kelas') {
                             <select onchange="guruKelasSelectedClass=this.value; renderPage()" class="p-2 border border-purple-100 rounded-xl text-xs font-bold outline-none bg-white">
                                 ${getAllowedGuruKelasClasses().map(a => `<option value="${a.kelas}" ${guruKelasSelectedClass===a.kelas?'selected':''}>${a.kelas}</option>`).join('')}
                             </select>
-                           <button onclick="refreshGuruKelasDashboard()"
-class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-    Refresh
-</button>
+           <button onclick="refreshGuruKelasDashboard()"
+            class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Segar
+            </button>
                         </div>
                     </div>
 
