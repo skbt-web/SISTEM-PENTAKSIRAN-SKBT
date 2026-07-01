@@ -380,6 +380,11 @@
         </div>
     </div>
 
+
+    <!-- MODAL EDIT / UPDATE PENGISIAN GURU OLEH ADMIN -->
+    <div id="admin-edit-filling-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"></div>
+
+
     <!-- NOTIFIKASI TOAST -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
@@ -447,6 +452,39 @@
                 .replace(/\b(PN|PUAN|EN|ENCIK|CIK|HJH|HJ|BT|BIN|BINTI)\.?\b/g, '')
                 .replace(/[^A-Z0-9]/g, '')
                 .trim();
+        }
+
+
+        // Padanan kelas yang selamat.
+        // Tujuan: Tahun 4 AR-RAZI dan 4 AL-KHAWARIZMI tidak bergabung semasa pengisian markah.
+        // Data lama yang ada beza '-' atau jarak masih boleh dibaca.
+        function normalizeClassName(value) {
+            return String(value || '')
+                .toUpperCase()
+                .replace(/AL\s*-?\s*KHAWARIZMI/g, 'AL KHAWARIZMI')
+                .replace(/AR\s*-?\s*RAZI/g, 'AR RAZI')
+                .replace(/[^A-Z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function containsMultipleClasses(value) {
+            const normalized = normalizeClassName(value);
+            const hasArRazi = /AR RAZI/.test(normalized);
+            const hasAlKhawarizmi = /AL KHAWARIZMI/.test(normalized);
+            return hasArRazi && hasAlKhawarizmi;
+        }
+
+        function isSameClassOnly(value, targetClass) {
+            if (!value || !targetClass) return false;
+            if (containsMultipleClasses(value)) return false;
+            return normalizeClassName(value) === normalizeClassName(targetClass);
+        }
+
+        function canonicalClassName(value) {
+            const normalized = normalizeClassName(value);
+            const match = classes.find(c => normalizeClassName(c) === normalized);
+            return match || String(value || '').toUpperCase().trim();
         }
 
         // Database Markah Sementara (In-Memory)
@@ -523,6 +561,7 @@
         let pbdStatusRows = [];
         let classVerificationRows = [];
         let classTeacherRows = [];
+        let teacherDirectoryRows = [];
         let guruKelasSelectedClass = '';
         // --- SUPABASE DATABASE SETUP ---
         function parseKey(key) {
@@ -614,6 +653,22 @@
                     pbdRows.forEach(row => {
                         if (row.key) studentPBD[row.key] = row.value;
                     });
+                }
+
+                // Direktori guru untuk pembetulan Admin. Emel digunakan secara dalaman sahaja dan tidak dipaparkan.
+                try {
+                    const { data: teacherDirectoryData, error: teacherDirectoryError } = await supabaseClient
+                        .from('teachers')
+                        .select('name,email')
+                        .order('name', { ascending: true });
+
+                    if (!teacherDirectoryError && teacherDirectoryData) {
+                        teacherDirectoryRows = teacherDirectoryData;
+                    } else {
+                        console.warn('Jadual teachers belum tersedia atau belum boleh dibaca.', teacherDirectoryError);
+                    }
+                } catch (tdErr) {
+                    console.warn('Jadual teachers belum tersedia atau belum boleh dibaca.', tdErr);
                 }
 
                 // Data Guru Kelas rasmi. Akses Guru Kelas ditapis melalui emel, bukan nama.
@@ -987,6 +1042,7 @@ if (type === 'guru_kelas') {
             currentUser = null;
             isAdmin = false;
             classTeacherRows = [];
+            teacherDirectoryRows = [];
             classVerificationRows = [];
             guruKelasSelectedClass = '';
             markStatusRows = [];
@@ -1242,7 +1298,7 @@ if (type === 'guru_kelas') {
             selectedYear = document.getElementById('sel-year').value;
             const newClass = document.getElementById('sel-class').value;
             const newClassYear = parseInt(newClass.charAt(0)) || 1;
-            selectedClass = newClass;
+            selectedClass = canonicalClassName(newClass);
             
             if (newClassYear < 4 && (selectedSubject === 'REKA BENTUK TEKNOLOGI' || selectedSubject === 'SEJARAH')) {
                 selectedSubject = 'BAHASA MELAYU';
@@ -1289,7 +1345,7 @@ if (type === 'guru_kelas') {
                                 value: num,
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
-                                kelas: selectedClass,
+                                kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
                             });
                             successCount++;
@@ -1309,7 +1365,7 @@ if (type === 'guru_kelas') {
                                 value: pbdVal,
                                 teacher_email: currentUser ? currentUser.email : null,
                                 teacher_name: selectedTeacher,
-                                kelas: selectedClass,
+                                kelas: canonicalClassName(selectedClass),
                                 updated_at: new Date().toISOString()
                             });
                         } else {
@@ -1335,8 +1391,11 @@ if (type === 'guru_kelas') {
         }
 
         async function hantarKeGuruKelas() {
+            selectedClass = canonicalClassName(selectedClass);
             await saveMarks(true);
-            showToast(`Kesemua data pentaksiran kelas [${selectedClass}] bagi subjek [${selectedSubject}] telah dihantar secara rasmi ke Dashboard Guru Kelas & Supabase!`, 'success');
+            await fetchAllDataFromSupabase();
+            showToast(`Data ${selectedSubject} kelas ${selectedClass} telah dihantar. Rekod akan muncul di Dashboard Guru Kelas dan Dashboard Admin mengikut kelas, guru, subjek dan pentaksiran.`, 'success');
+            renderPage();
         }
 
         // --- CSV LOADING AND PROCESSING ---
@@ -1355,7 +1414,7 @@ if (type === 'guru_kelas') {
                     if (columns.length >= 3) {
                         const nama = columns[0].trim().toUpperCase();
                         const ic = columns[1].trim();
-                        const kelas = columns[2].trim().toUpperCase();
+                        const kelas = canonicalClassName(columns[2].trim());
 
                         if (nama && ic && kelas) {
                             tempUploadedStudents.push({ nama, ic, kelas });
@@ -1422,7 +1481,7 @@ if (type === 'guru_kelas') {
 
             const nama = namaInput.value.trim().toUpperCase();
             const ic = icInput.value.trim();
-            const kelas = kelasSelect.value;
+            const kelas = canonicalClassName(kelasSelect.value);
 
             if (!nama || !ic || !kelas) {
                 showToast('Sila isikan semua butiran pendaftaran murid.', 'warning');
@@ -1473,26 +1532,33 @@ if (type === 'guru_kelas') {
 
         // --- STATUS PENGISIAN GURU / ADMIN ---
         function getClassStudentCount(kelasName) {
-            return students.filter(s => s.kelas === kelasName).length;
+            return students.filter(s => isSameClassOnly(s.kelas, kelasName)).length;
         }
 
         function buildFillingStatusRows(scope = 'admin', classFilter = null) {
             const grouped = {};
-            const filteredRows = (markStatusRows || []).filter(row => {
+            const allRows = [
+                ...(markStatusRows || []).map(row => ({ ...row, data_type: 'MARKAH' })),
+                ...(pbdStatusRows || []).map(row => ({ ...row, data_type: 'PBD' }))
+            ];
+
+            const filteredRows = allRows.filter(row => {
                 if (!row) return false;
                 if (selectedYear && String(row.tahun) !== String(selectedYear)) return false;
                 if (selectedAssessment && row.assessment !== selectedAssessment) return false;
-                if (classFilter && row.kelas !== classFilter) return false;
+                if (classFilter && !isSameClassOnly(row.kelas, classFilter)) return false;
+                if (containsMultipleClasses(row.kelas)) return false;
                 return true;
             });
 
             filteredRows.forEach(row => {
-                const kelasName = row.kelas || '-';
+                const kelasName = canonicalClassName(row.kelas || '-');
                 const subjectName = row.subject || '-';
                 const teacherName = row.teacher_name || row.teacher_email || '-';
+                const teacherEmail = cleanEmail(row.teacher_email || '');
                 const assessmentName = row.assessment || '-';
                 const tahunName = row.tahun || selectedYear;
-                const key = [tahunName, assessmentName, kelasName, subjectName, teacherName].join('||');
+                const key = [tahunName, assessmentName, normalizeClassName(kelasName), subjectName, teacherEmail || normalizeTeacherName(teacherName)].join('||');
 
                 if (!grouped[key]) {
                     grouped[key] = {
@@ -1502,25 +1568,35 @@ if (type === 'guru_kelas') {
                         subject: subjectName,
                         teacher_name: teacherName,
                         teacher_email: row.teacher_email || '-',
-                        studentIds: new Set(),
-                        updated_at: row.updated_at || null
+                        markStudentIds: new Set(),
+                        pbdStudentIds: new Set(),
+                        allStudentIds: new Set(),
+                        updated_at: row.updated_at || row.tarikh || null
                     };
                 }
 
-                if (row.student_id) grouped[key].studentIds.add(String(row.student_id));
-                if (row.updated_at && (!grouped[key].updated_at || new Date(row.updated_at) > new Date(grouped[key].updated_at))) {
-                    grouped[key].updated_at = row.updated_at;
+                if (row.student_id) {
+                    grouped[key].allStudentIds.add(String(row.student_id));
+                    if (row.data_type === 'MARKAH') grouped[key].markStudentIds.add(String(row.student_id));
+                    if (row.data_type === 'PBD') grouped[key].pbdStudentIds.add(String(row.student_id));
+                }
+
+                const rowDate = row.updated_at || row.tarikh || null;
+                if (rowDate && (!grouped[key].updated_at || new Date(rowDate) > new Date(grouped[key].updated_at))) {
+                    grouped[key].updated_at = rowDate;
                 }
             });
 
             const result = Object.values(grouped).map(item => {
                 const total = getClassStudentCount(item.kelas);
-                const completed = item.studentIds.size;
+                const markCompleted = item.markStudentIds.size;
+                const pbdCompleted = item.pbdStudentIds.size;
+                const completed = item.allStudentIds.size;
                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
                 let status = 'BELUM MULA';
                 if (completed > 0 && completed < total) status = 'SEBAHAGIAN';
                 if (total > 0 && completed >= total) status = 'SIAP';
-                return { ...item, total, completed, percent, status };
+                return { ...item, total, completed, markCompleted, pbdCompleted, percent, status };
             });
 
             return result.sort((a, b) => {
@@ -1544,6 +1620,209 @@ if (type === 'guru_kelas') {
             if (status === 'SIAP') return '<span class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black">SIAP</span>';
             if (status === 'SEBAHAGIAN') return '<span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-black">SEBAHAGIAN</span>';
             return '<span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-black">BELUM MULA</span>';
+        }
+
+
+        function encodeAdminEditPayload(obj) {
+            try {
+                return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function decodeAdminEditPayload(value) {
+            try {
+                return JSON.parse(decodeURIComponent(escape(atob(value))));
+            } catch (e) {
+                console.error('Payload pembetulan tidak sah:', e);
+                return null;
+            }
+        }
+
+        function getTeacherEmailByName(name) {
+            const target = normalizeTeacherName(name);
+            const found = (teacherDirectoryRows || []).find(t => normalizeTeacherName(t.name) === target);
+            return found ? cleanEmail(found.email) : '';
+        }
+
+        function openAdminEditFilling(payloadEncoded) {
+            if (!isAdmin) {
+                showToast('Hanya Admin boleh membuat pembetulan rekod.', 'warning');
+                return;
+            }
+
+            const payload = decodeAdminEditPayload(payloadEncoded);
+            if (!payload) {
+                showToast('Rekod tidak dapat dibaca untuk pembetulan.', 'danger');
+                return;
+            }
+
+            const teacherOptions = (teacherDirectoryRows && teacherDirectoryRows.length > 0 ? teacherDirectoryRows.map(t => t.name).filter(Boolean) : teachers)
+                .filter((v, i, arr) => arr.indexOf(v) === i)
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map(name => `<option value="${String(name).replace(/"/g, '&quot;')}" ${name === payload.teacher_name ? 'selected' : ''}>${name}</option>`)
+                .join('');
+
+            const modal = document.getElementById('admin-edit-filling-modal');
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="font-black text-slate-800 text-lg flex items-center gap-2">
+                                <i data-lucide="edit-3" class="w-5 h-5 text-purple-600"></i>
+                                Edit / Update Pengisian Guru
+                            </h3>
+                            <p class="text-xs text-slate-500 font-semibold mt-1">Pembetulan ini akan mengemas kini rekod marks dan pbd yang sepadan. Markah murid tidak dipadam.</p>
+                        </div>
+                        <button onclick="closeAdminEditFillingModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Nama Guru Betul</label>
+                            <select id="admin-edit-teacher" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${teacherOptions}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Kelas Betul</label>
+                            <select id="admin-edit-class" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${classes.map(c => `<option value="${c}" ${c === payload.kelas ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Subjek Betul</label>
+                            <select id="admin-edit-subject" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${baseSubjects.map(s => `<option value="${s}" ${s === payload.subject ? 'selected' : ''}>${s}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase">Pentaksiran Betul</label>
+                            <select id="admin-edit-assessment" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                                ${assessments.map(a => `<option value="${a}" ${a === payload.assessment ? 'selected' : ''}>${a}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-100 text-amber-800 rounded-2xl p-4 text-xs font-semibold leading-relaxed">
+                        Rekod asal: <b>${payload.teacher_name}</b> | <b>${payload.kelas}</b> | <b>${payload.subject}</b> | <b>${payload.assessment}</b><br>
+                        Selepas update, rekod akan keluar daripada guru/subjek yang salah dan masuk ke guru/subjek yang betul.
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button onclick="closeAdminEditFillingModal()" class="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+                        <button onclick="updateAdminFillingCorrection('${payloadEncoded}')" class="px-5 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md flex items-center gap-1.5">
+                            <i data-lucide="save" class="w-4 h-4"></i> Simpan Update
+                        </button>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeAdminEditFillingModal() {
+            const modal = document.getElementById('admin-edit-filling-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.innerHTML = '';
+            }
+        }
+
+        async function updateRowsForTable(tableName, oldPayload, newPayload) {
+            const oldEmail = cleanEmail(oldPayload.teacher_email);
+            let query = supabaseClient
+                .from(tableName)
+                .select('student_id,tahun,assessment,subject,kelas,teacher_email,teacher_name')
+                .eq('tahun', String(oldPayload.tahun))
+                .eq('assessment', oldPayload.assessment)
+                .eq('subject', oldPayload.subject)
+                .eq('kelas', oldPayload.kelas);
+
+            if (oldEmail && oldEmail !== '-') {
+                query = query.eq('teacher_email', oldEmail);
+            } else {
+                query = query.eq('teacher_name', oldPayload.teacher_name);
+            }
+
+            const { data: rows, error: selectError } = await query;
+            if (selectError) throw selectError;
+            if (!rows || rows.length === 0) return 0;
+
+            let updatedCount = 0;
+            for (const row of rows) {
+                const newKey = `${row.student_id}_${newPayload.tahun}_${newPayload.assessment}_${newPayload.subject}`;
+                let updateQuery = supabaseClient
+                    .from(tableName)
+                    .update({
+                        key: newKey,
+                        tahun: String(newPayload.tahun),
+                        assessment: newPayload.assessment,
+                        subject: newPayload.subject,
+                        kelas: newPayload.kelas,
+                        teacher_name: newPayload.teacher_name,
+                        teacher_email: newPayload.teacher_email || oldPayload.teacher_email || null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('student_id', String(row.student_id))
+                    .eq('tahun', String(oldPayload.tahun))
+                    .eq('assessment', oldPayload.assessment)
+                    .eq('subject', oldPayload.subject)
+                    .eq('kelas', oldPayload.kelas);
+
+                const rowEmail = cleanEmail(row.teacher_email || oldPayload.teacher_email);
+                if (rowEmail && rowEmail !== '-') {
+                    updateQuery = updateQuery.eq('teacher_email', rowEmail);
+                } else {
+                    updateQuery = updateQuery.eq('teacher_name', oldPayload.teacher_name);
+                }
+
+                const { error: updateError } = await updateQuery;
+                if (updateError) throw updateError;
+                updatedCount++;
+            }
+            return updatedCount;
+        }
+
+        async function updateAdminFillingCorrection(payloadEncoded) {
+            if (!isAdmin || !supabaseEnabled || !supabaseClient) {
+                showToast('Akses Admin atau Supabase tidak tersedia.', 'danger');
+                return;
+            }
+
+            const oldPayload = decodeAdminEditPayload(payloadEncoded);
+            if (!oldPayload) return;
+
+            const newTeacherName = document.getElementById('admin-edit-teacher').value;
+            const newClass = document.getElementById('admin-edit-class').value;
+            const newSubject = document.getElementById('admin-edit-subject').value;
+            const newAssessment = document.getElementById('admin-edit-assessment').value;
+            const newTeacherEmail = getTeacherEmailByName(newTeacherName) || cleanEmail(oldPayload.teacher_email);
+
+            const newPayload = {
+                tahun: oldPayload.tahun,
+                assessment: newAssessment,
+                subject: newSubject,
+                kelas: newClass,
+                teacher_name: newTeacherName,
+                teacher_email: newTeacherEmail
+            };
+
+            try {
+                const markCount = await updateRowsForTable('marks', oldPayload, newPayload);
+                const pbdCount = await updateRowsForTable('pbd', oldPayload, newPayload);
+
+                closeAdminEditFillingModal();
+                await fetchAllDataFromSupabase();
+                renderPage();
+                showToast(`Update berjaya. Marks: ${markCount} rekod, PBD: ${pbdCount} rekod.`, 'success');
+            } catch (e) {
+                console.error('Gagal update pembetulan Admin:', e);
+                showToast('Gagal update rekod. Semak RLS, column key, atau struktur table marks/pbd.', 'danger');
+            }
         }
 
         function renderFillingStatusPanel(scope = 'admin', classFilter = null) {
@@ -1607,11 +1886,12 @@ if (type === 'guru_kelas') {
                                     <th class="p-4 text-center">%</th>
                                     <th class="p-4">Kemaskini</th>
                                     <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center no-print">Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
                                 ${rows.length === 0 ? `
-                                    <tr><td colspan="8" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
+                                    <tr><td colspan="9" class="p-6 text-center text-slate-400 font-bold">Belum ada data pengisian untuk pilihan ini.</td></tr>
                                 ` : rows.map(r => `
                                     <tr class="hover:bg-slate-50/60">
                                         <td class="p-4 font-bold text-slate-800">${r.teacher_name}</td>
@@ -1622,6 +1902,11 @@ if (type === 'guru_kelas') {
                                         <td class="p-4 text-center font-black text-slate-700">${r.percent}%</td>
                                         <td class="p-4 text-slate-500 font-semibold">${formatDateTimeMY(r.updated_at)}</td>
                                         <td class="p-4 text-center">${renderStatusBadge(r.status)}</td>
+                                        <td class="p-4 text-center no-print">
+                                            <button onclick="openAdminEditFilling('${encodeAdminEditPayload(r)}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-black inline-flex items-center gap-1">
+                                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit / Update
+                                            </button>
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -1745,7 +2030,7 @@ if (type === 'guru_kelas') {
 
         function getSlipClassRank(student) {
             if (!student) return '-';
-            const classmates = students.filter(s => s.kelas === student.kelas);
+            const classmates = students.filter(s => isSameClassOnly(s.kelas, student.kelas));
             const scores = classmates.map(s => ({ id: s.id, total: getStudentTotalForSlip(s).total }))
                 .sort((a, b) => b.total - a.total);
             const index = scores.findIndex(s => String(s.id) === String(student.id));
@@ -2229,7 +2514,7 @@ if (type === 'guru_kelas') {
 
         function getVerificationForClass(kelasName, jenis) {
             return (classVerificationRows || []).find(row =>
-                row.kelas === kelasName &&
+                isSameClassOnly(row.kelas, kelasName) &&
                 String(row.tahun) === String(selectedYear) &&
                 row.assessment === selectedAssessment &&
                 row.jenis === jenis
@@ -2237,7 +2522,7 @@ if (type === 'guru_kelas') {
         }
 
         function getClassCompletionSummary(kelasName) {
-            const classStudents = students.filter(s => s.kelas === kelasName);
+            const classStudents = students.filter(s => isSameClassOnly(s.kelas, kelasName));
             const totalStudents = classStudents.length;
             const subjectList = getSubjectsForClass(kelasName);
             let completedSubjects = 0;
@@ -2245,8 +2530,9 @@ if (type === 'guru_kelas') {
             let totalFilled = 0;
 
             subjectList.forEach(sub => {
-                const filled = new Set((markStatusRows || []).filter(row =>
-                    row.kelas === kelasName &&
+                const combinedRows = [ ...(markStatusRows || []), ...(pbdStatusRows || []) ];
+                const filled = new Set(combinedRows.filter(row =>
+                    isSameClassOnly(row.kelas, kelasName) &&
                     row.subject === sub &&
                     row.assessment === selectedAssessment &&
                     String(row.tahun) === String(selectedYear)
@@ -2660,7 +2946,7 @@ if (type === 'guru_kelas') {
             else if (currentPage === 'pengisian_markah') {
                 const classYearNum = parseInt(selectedClass.charAt(0)) || 1;
                 const subjectsToUse = baseSubjects;
-                const activeStudents = students.filter(s => s.kelas === selectedClass);
+                const activeStudents = students.filter(s => isSameClassOnly(s.kelas, selectedClass));
 
                 content.innerHTML = `
                     <div class="space-y-6">
@@ -2705,6 +2991,7 @@ if (type === 'guru_kelas') {
                                     <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                                     Prestasi Murid: ${selectedClass} (${activeStudents.length} Murid)
                                 </h3>
+                                ${activeStudents.length === 0 && String(selectedClass).startsWith('4 ') ? `<span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">Jika murid Tahun 4 kosong, semak data murid supaya kelas tidak digabungkan.</span>` : ''}
                                 <div class="flex items-center gap-2">
                                     <button onclick="toggleEditMode()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1">
                                         <i data-lucide="${isEditMode ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i> ${isEditMode ? 'Kunci Mod' : 'Kemaskini'}
@@ -2854,7 +3141,7 @@ if (type === 'guru_kelas') {
                     `;
                 } else {
                     const assignedClass = guruKelasSelectedClass;
-                    const classStudents = students.filter(s => s.kelas === assignedClass);
+                    const classStudents = students.filter(s => isSameClassOnly(s.kelas, assignedClass));
 
                     content.innerHTML = `
                         <div class="space-y-6">
